@@ -18,10 +18,11 @@ export const ServiceSchema = z.object({
   /** Port inside the container. */
   containerPort: z.number().int().min(1).max(65535),
   /**
-   * fork   → each `--fork` gets its own instance of this service
-   * shared → forks reuse the baseline instance (started on demand)
+   * container  → each `--fork` gets its own compose service instance
+   * namespace  → fork gets a namespace token inside the baseline's service
+   * shared     → forks reuse the baseline service as-is
    */
-  scope: z.enum(["fork", "shared"]).default("fork"),
+  isolation: z.enum(["container", "namespace", "shared"]).default("container"),
   /**
    * Extra env vars to emit into the generated env file.
    * Values are templates: {port}, {host}, {service} are substituted.
@@ -45,8 +46,24 @@ export const HooksSchema = z
      * doesn't block the tool. Point it at whichever wins.
      */
     bootstrap: z.string().optional(),
+    /**
+     * Command run when a fork comes up, before seed. Use for engine-specific
+     * namespace/database creation (e.g. CREATE DATABASE).
+     */
+    forkCreate: z.string().optional(),
+    /**
+     * Command run when a fork goes down, before compose teardown.
+     * Use for engine-specific namespace/database cleanup.
+     */
+    forkDestroy: z.string().optional(),
   })
   .default({});
+
+export const AllocationSchema = z.object({
+  /** Host port for the baseline (slot 0) instance of this allocation. */
+  basePort: z.number().int().min(1).max(65535),
+});
+export type AllocationDef = z.infer<typeof AllocationSchema>;
 
 export const EnvironmentSchema = z.object({
   /**
@@ -55,6 +72,11 @@ export const EnvironmentSchema = z.object({
    */
   persistent: z.boolean().default(false),
   services: z.record(z.string(), ServiceSchema),
+  /**
+   * Named port slots forkspace reserves and exports but does not start
+   * processes for. Same slot math as services (basePort + slot × slotSize).
+   */
+  allocations: z.record(z.string(), AllocationSchema).default({}),
   hooks: HooksSchema,
 });
 export type EnvironmentDef = z.infer<typeof EnvironmentSchema>;
@@ -92,8 +114,31 @@ export function findRoot(startDir: string): string {
   }
 }
 
+/** Reject v0.1 `scope` keys with a migration hint before zod runs. */
+function rejectLegacyScope(data: unknown): void {
+  if (!data || typeof data !== "object") return;
+  const envs = (data as Record<string, unknown>).environments;
+  if (!envs || typeof envs !== "object") return;
+  for (const [envName, env] of Object.entries(envs as Record<string, unknown>)) {
+    if (!env || typeof env !== "object") continue;
+    const services = (env as Record<string, unknown>).services;
+    if (!services || typeof services !== "object") continue;
+    for (const [svcName, svc] of Object.entries(services as Record<string, unknown>)) {
+      if (svc && typeof svc === "object" && "scope" in svc) {
+        throw new Error(
+          `Invalid ${CONFIG_FILENAME}:\n` +
+            `  environments.${envName}.services.${svcName}: ` +
+            `"scope" was renamed to "isolation" (values: container | namespace | shared). ` +
+            `Use "container" instead of "fork".`
+        );
+      }
+    }
+  }
+}
+
 export function parseConfig(raw: string): Config {
   const data = parse(raw);
+  rejectLegacyScope(data);
   const result = ConfigSchema.safeParse(data);
   if (!result.success) {
     const issues = result.error.issues

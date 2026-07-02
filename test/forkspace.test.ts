@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { parseConfig } from "../src/config";
+import path from "node:path";
+import { parseConfig, checkConfig, loadConfig } from "../src/config";
 import { portFor, allocateSlot } from "../src/ports";
 import { buildOverrideYaml, groupByComposeFile } from "../src/compose";
 import { renderEnvFile, envToRecord, envFileName } from "../src/env";
@@ -20,7 +21,7 @@ environments:
         service: dynamodb
         basePort: 8100
         containerPort: 8000
-        scope: shared
+        isolation: shared
 `;
 
 describe("config", () => {
@@ -28,14 +29,51 @@ describe("config", () => {
     const cfg = parseConfig(MINIMAL_YML);
     expect(cfg.slotSize).toBe(10);
     expect(cfg.environments.test.persistent).toBe(false);
-    expect(cfg.environments.test.services.mysql.scope).toBe("fork");
-    expect(cfg.environments.test.services.dynamodb.scope).toBe("shared");
+    expect(cfg.environments.test.allocations).toEqual({});
+    expect(cfg.environments.test.services.mysql.isolation).toBe("container");
+    expect(cfg.environments.test.services.dynamodb.isolation).toBe("shared");
+  });
+
+  it("parses allocations and fork hooks", () => {
+    const yml = `
+workspace: app
+environments:
+  test:
+    allocations:
+      app:
+        basePort: 4100
+    services:
+      mysql:
+        compose: api/docker-compose.yml
+        service: db
+        basePort: 3406
+        containerPort: 3306
+    hooks:
+      forkCreate: ./scripts/fork-create.sh
+      forkDestroy: ./scripts/fork-destroy.sh
+`;
+    const cfg = parseConfig(yml);
+    expect(cfg.environments.test.allocations.app.basePort).toBe(4100);
+    expect(cfg.environments.test.hooks.forkCreate).toBe("./scripts/fork-create.sh");
+    expect(cfg.environments.test.hooks.forkDestroy).toBe("./scripts/fork-destroy.sh");
+  });
+
+  it("rejects legacy scope keys with a migration hint", () => {
+    expect(() =>
+      parseConfig(MINIMAL_YML.replace("isolation: shared", "scope: shared"))
+    ).toThrow(/scope.*renamed to.*isolation/i);
   });
 
   it("rejects bad workspace names", () => {
     expect(() => parseConfig(MINIMAL_YML.replace("acme", "Sun Bound"))).toThrow(
       /workspace/
     );
+  });
+
+  it("check passes against fixture workspace", () => {
+    const root = path.join(__dirname, "fixtures", "workspace");
+    const config = loadConfig(root);
+    expect(checkConfig(config, root)).toEqual([]);
   });
 });
 
@@ -68,7 +106,7 @@ describe("compose override", () => {
         service: "db",
         basePort: 3406,
         containerPort: 3306,
-        scope: "fork" as const,
+        isolation: "container" as const,
         exports: {},
       },
       hostPort: 3416,
@@ -112,7 +150,7 @@ describe("env file", () => {
             service: "db",
             basePort: 3406,
             containerPort: 3306,
-            scope: "fork",
+            isolation: "container",
             exports: { DATABASE_URL: "mysql://root:root@{host}:{port}/app" },
           },
           hostPort: 3416,

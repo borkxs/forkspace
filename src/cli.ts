@@ -58,7 +58,7 @@ program
   .option("--fork <name>", "start an isolated fork of this environment")
   .option(
     "--isolate <services>",
-    "comma-separated services to fork; others are treated as shared (overrides config scope)"
+    "comma-separated services to isolate; others reuse baseline (overrides config isolation)"
   )
   .option("--no-hooks", "skip bootstrap/seed hooks")
   .action(async (envName: string, opts: { fork?: string; isolate?: string; hooks: boolean }) => {
@@ -73,7 +73,7 @@ program
       return;
     }
 
-    // Partition services into fork-scoped vs shared for THIS instance.
+    // Partition services into container-isolated vs baseline-reused for THIS instance.
     const isolateSet = opts.isolate
       ? new Set(opts.isolate.split(",").map((s) => s.trim()))
       : null;
@@ -83,11 +83,13 @@ program
       }
     }
     const allNames = Object.keys(env.services);
-    const forkScoped = (name: string) =>
-      isolateSet ? isolateSet.has(name) : env.services[name].scope === "fork";
+    const containerIsolated = (name: string) =>
+      isolateSet
+        ? isolateSet.has(name)
+        : env.services[name].isolation === "container";
 
-    const ownNames = fork ? allNames.filter(forkScoped) : allNames;
-    const sharedNames = fork ? allNames.filter((n) => !forkScoped(n)) : [];
+    const ownNames = fork ? allNames.filter(containerIsolated) : allNames;
+    const sharedNames = fork ? allNames.filter((n) => !containerIsolated(n)) : [];
 
     // A fork's shared services live in the baseline instance — make sure it exists.
     if (fork && sharedNames.length > 0 && !state.instances[envName]) {
@@ -290,22 +292,29 @@ environments:
 
   test:
     persistent: false
+    allocations:
+      app:
+        basePort: 4100
     services:
       mysql:
         compose: api/docker-compose.yml
         service: db
         basePort: 3406
         containerPort: 3306
-        scope: fork
+        isolation: namespace   # fork gets its own database namespace
+        exports:
+          DATABASE_URL: "mysql://root:root@{host}:{port}/{ns}"
       dynamodb:
         compose: api/docker-compose.yml
         service: dynamodb
         basePort: 8100
         containerPort: 8000
-        scope: shared      # forks reuse the baseline instance
+        isolation: shared      # forks reuse the baseline instance
     hooks:
       bootstrap: npm run db:create-tables
       seed: npm run db:seed-test
+      forkCreate: ./scripts/fork-create.sh
+      forkDestroy: ./scripts/fork-destroy.sh
 `;
 
 program.parseAsync().catch((err: unknown) => {

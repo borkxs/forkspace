@@ -1,0 +1,17 @@
+services:
+  db:
+    image: mysql:8
+    ports:
+      - "3306:3306"
+  dynamodb:
+    image: amazon/dynamodb-local
+    ports:
+      - "8000:8000"
+  elasticmq:
+    image: softwaremill/elasticmq-native
+    ports:
+      - "9324:9324"
+  minio:
+    image: minio/minio
+    ports:
+      - "9000:9000"
