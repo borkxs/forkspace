@@ -5,8 +5,12 @@ import { portFor, allocateSlot } from "../src/ports";
 import { buildOverrideYaml, groupByComposeFile } from "../src/compose";
 import { renderEnvFile, envToRecord, envFileName } from "../src/env";
 import { nsFor } from "../src/ns";
-import { portFor } from "../src/ports";
-import { instanceKey, projectName } from "../src/state";
+import { instanceKey, projectName, type State } from "../src/state";
+import {
+  containerIsolated,
+  planInstance,
+  planSlotProbe,
+} from "../src/plan";
 
 const MINIMAL_YML = `
 workspace: acme
@@ -295,5 +299,196 @@ describe("naming", () => {
     expect(instanceKey("test", "agent-a")).toBe("test@agent-a");
     expect(projectName("acme", "test", "agent-a")).toBe("fs-acme-test-agent-a");
     expect(projectName("acme", "dev", null)).toBe("fs-acme-dev");
+  });
+});
+
+const TEST_ENV = parseConfig(MINIMAL_YML).environments.test;
+const SLOT_SIZE = 10;
+
+function emptyState(): State {
+  return { instances: {} };
+}
+
+describe("planInstance", () => {
+  it("baseline starts all services and runs bootstrap → seed", () => {
+    const env = {
+      ...TEST_ENV,
+      hooks: {
+        bootstrap: "npm run bootstrap",
+        seed: "npm run seed",
+        forkCreate: "./fork-create.sh",
+        forkDestroy: "./fork-destroy.sh",
+      },
+    };
+    const plan = planInstance({
+      config: { workspace: "acme", slotSize: SLOT_SIZE, environments: { test: env } },
+      env,
+      envName: "test",
+      fork: null,
+      state: emptyState(),
+      isolateSet: null,
+      slot: 0,
+    });
+
+    expect(plan.containersToStart.map((s) => s.name).sort()).toEqual(["dynamodb", "mysql"]);
+    expect(plan.ns).toBe("");
+    expect(plan.backing).toBe("container");
+    expect(plan.requiresBaseline).toBe(false);
+    expect(plan.hooks.up).toEqual(["npm run bootstrap", "npm run seed"]);
+    expect(plan.hooks.down).toBeUndefined();
+    expect(plan.ports.mysql).toBe(3406);
+    expect(plan.ports.dynamodb).toBe(8100);
+  });
+
+  it("container-isolated fork starts only container services", () => {
+    const env = {
+      ...TEST_ENV,
+      services: {
+        mysql: { ...TEST_ENV.services.mysql, isolation: "container" as const },
+        dynamodb: { ...TEST_ENV.services.dynamodb, isolation: "shared" as const },
+      },
+      hooks: { seed: "npm run seed" },
+    };
+    const state: State = {
+      instances: {
+        test: {
+          key: "test",
+          env: "test",
+          fork: null,
+          slot: 0,
+          project: "fs-acme-test",
+          ns: "",
+          backing: "container",
+          ports: { mysql: 3406, dynamodb: 8100 },
+          services: ["mysql", "dynamodb"],
+          envFile: ".env.forkspace.test",
+          createdAt: "",
+        },
+      },
+    };
+    const plan = planInstance({
+      config: { workspace: "acme", slotSize: SLOT_SIZE, environments: { test: env } },
+      env,
+      envName: "test",
+      fork: "agent-a",
+      state,
+      isolateSet: null,
+      slot: 1,
+    });
+
+    expect(plan.containersToStart.map((s) => s.name)).toEqual(["mysql"]);
+    expect(plan.containersToStart[0].hostPort).toBe(3416);
+    expect(plan.ports.mysql).toBe(3416);
+    expect(plan.ports.dynamodb).toBe(8100);
+    expect(plan.ns).toBe("agent_a");
+    expect(plan.backing).toBe("container");
+    expect(plan.requiresBaseline).toBe(true);
+    expect(plan.baselineDependentServices).toEqual(["dynamodb"]);
+    expect(plan.hooks.up).toEqual(["npm run seed"]);
+  });
+
+  it("namespace-only fork has no containers and runs forkCreate → seed", () => {
+    const env = {
+      ...TEST_ENV,
+      services: {
+        mysql: { ...TEST_ENV.services.mysql, isolation: "namespace" as const },
+        dynamodb: { ...TEST_ENV.services.dynamodb, isolation: "shared" as const },
+      },
+      hooks: {
+        forkCreate: "./fork-create.sh",
+        seed: "npm run seed",
+        forkDestroy: "./fork-destroy.sh",
+      },
+    };
+    const state: State = {
+      instances: {
+        test: {
+          key: "test",
+          env: "test",
+          fork: null,
+          slot: 0,
+          project: "fs-acme-test",
+          ns: "",
+          backing: "container",
+          ports: { mysql: 3406, dynamodb: 8100 },
+          services: ["mysql", "dynamodb"],
+          envFile: ".env.forkspace.test",
+          createdAt: "",
+        },
+      },
+    };
+    const plan = planInstance({
+      config: { workspace: "acme", slotSize: SLOT_SIZE, environments: { test: env } },
+      env,
+      envName: "test",
+      fork: "agent-a",
+      state,
+      isolateSet: null,
+      slot: 2,
+    });
+
+    expect(plan.containersToStart).toEqual([]);
+    expect(plan.containerServiceNames).toEqual([]);
+    expect(plan.backing).toBe("namespace-only");
+    expect(plan.ports.mysql).toBe(3406);
+    expect(plan.ports.dynamodb).toBe(8100);
+    expect(plan.hooks.up).toEqual(["./fork-create.sh", "npm run seed"]);
+    expect(plan.hooks.down).toBe("./fork-destroy.sh");
+  });
+
+  it("planSlotProbe includes only container services and allocations", () => {
+    const env = {
+      ...TEST_ENV,
+      allocations: { app: { basePort: 4100 } },
+      services: {
+        mysql: { ...TEST_ENV.services.mysql, isolation: "namespace" as const },
+        dynamodb: { ...TEST_ENV.services.dynamodb, isolation: "container" as const },
+      },
+    };
+    expect(
+      planSlotProbe({ env, fork: "agent-a", isolateSet: null }).sort((a, b) => a - b)
+    ).toEqual([4100, 8100]);
+    expect(planSlotProbe({ env, fork: null, isolateSet: null })).toEqual([]);
+  });
+
+  it("--isolate forces listed services to container isolation", () => {
+    const env = {
+      ...TEST_ENV,
+      services: {
+        mysql: { ...TEST_ENV.services.mysql, isolation: "namespace" as const },
+        dynamodb: { ...TEST_ENV.services.dynamodb, isolation: "shared" as const },
+      },
+    };
+    const isolateSet = new Set(["mysql"]);
+    expect(containerIsolated("mysql", env, isolateSet)).toBe(true);
+    expect(containerIsolated("dynamodb", env, isolateSet)).toBe(false);
+
+    const plan = planInstance({
+      config: { workspace: "acme", slotSize: SLOT_SIZE, environments: { test: env } },
+      env,
+      envName: "test",
+      fork: "agent-a",
+      state: {
+        instances: {
+          test: {
+            key: "test",
+            env: "test",
+            fork: null,
+            slot: 0,
+            project: "fs-acme-test",
+            ns: "",
+            backing: "container",
+            ports: { mysql: 3406, dynamodb: 8100 },
+            services: ["mysql", "dynamodb"],
+            envFile: ".env.forkspace.test",
+            createdAt: "",
+          },
+        },
+      },
+      isolateSet,
+      slot: 1,
+    });
+    expect(plan.containersToStart.map((s) => s.name)).toEqual(["mysql"]);
+    expect(plan.baselineDependentServices).toEqual(["dynamodb"]);
   });
 });

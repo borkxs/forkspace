@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { existsSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   CONFIG_FILENAME,
@@ -10,14 +10,14 @@ import {
   type Config,
   type EnvironmentDef,
 } from "./config";
-import { allocateSlot, portFor } from "./ports";
+import { allocateSlot } from "./ports";
 import {
   instanceKey,
   loadState,
-  projectName,
   saveState,
   takenSlots,
   type InstanceRecord,
+  type State,
 } from "./state";
 import {
   composeDown,
@@ -25,10 +25,9 @@ import {
   composeUp,
   planComposeRuns,
   runHook,
-  type PlannedService,
 } from "./compose";
 import { envToRecord, renderEnvFile, writeEnvFile } from "./env";
-import { nsFor } from "./ns";
+import { planInstance, planSlotProbe } from "./plan";
 
 const program = new Command();
 program
@@ -52,6 +51,180 @@ function resolveEnv(config: Config, envName: string): EnvironmentDef {
   return env;
 }
 
+function parseIsolateSet(
+  env: EnvironmentDef,
+  isolate?: string
+): Set<string> | null {
+  if (!isolate) return null;
+  const isolateSet = new Set(isolate.split(",").map((s) => s.trim()));
+  for (const name of isolateSet) {
+    if (!env.services[name]) throw new Error(`--isolate: unknown service "${name}"`);
+  }
+  return isolateSet;
+}
+
+export async function doUp(
+  root: string,
+  config: Config,
+  state: State,
+  envName: string,
+  opts: { fork?: string; isolate?: string; hooks: boolean }
+): Promise<void> {
+  const env = resolveEnv(config, envName);
+  const fork = opts.fork ?? null;
+  const key = instanceKey(envName, fork);
+  const isolateSet = parseIsolateSet(env, opts.isolate);
+
+  if (state.instances[key]) {
+    console.log(`Instance ${key} already exists (project ${state.instances[key].project}).`);
+    console.log(`Run \`forkspace down ${envName}${fork ? ` --fork ${fork}` : ""}\` first, or use it as-is.`);
+    return;
+  }
+
+  const slot = fork
+    ? await allocateSlot({
+        basePorts: planSlotProbe({ env, fork, isolateSet }),
+        slotSize: config.slotSize,
+        takenSlots: takenSlots(state, envName),
+        minSlot: 1,
+      })
+    : 0;
+
+  const plan = planInstance({
+    config,
+    env,
+    envName,
+    fork,
+    state,
+    isolateSet,
+    slot,
+  });
+
+  if (plan.requiresBaseline && !state.instances[envName]) {
+    throw new Error(
+      `Fork "${fork}" depends on baseline services (${plan.baselineDependentServices.join(", ")}) ` +
+        `from "${envName}", which isn't up. Run \`forkspace up ${envName}\` first.`
+    );
+  }
+
+  console.log(
+    `▲ ${plan.key} → project ${plan.project} (slot ${plan.slot}, ${plan.backing})`
+  );
+  if (plan.ns) console.log(`  ns ${plan.ns}`);
+  for (const p of plan.containersToStart) {
+    console.log(`  ${p.name.padEnd(12)} :${p.hostPort}`);
+  }
+  if (plan.containersToStart.length === 0 && fork) {
+    console.log(`  (no container services — namespace-only fork)`);
+  }
+
+  if (plan.containersToStart.length > 0) {
+    const runs = planComposeRuns(root, plan.project, plan.containersToStart);
+    for (const run of runs) composeUp(root, run);
+  }
+
+  const content = renderEnvFile({
+    env: envName,
+    fork,
+    project: plan.project,
+    ns: plan.ns,
+    entries: plan.envEntries,
+    allocations: plan.allocationEntries,
+  });
+  const envFile = writeEnvFile(root, envName, fork, content);
+  console.log(`  env file → ${envFile}`);
+
+  const record: InstanceRecord = {
+    key: plan.key,
+    env: envName,
+    fork,
+    slot: plan.slot,
+    project: plan.project,
+    ns: plan.ns,
+    backing: plan.backing,
+    ports: plan.ports,
+    services: plan.containerServiceNames,
+    envFile,
+    createdAt: new Date().toISOString(),
+  };
+  state.instances[key] = record;
+  saveState(root, state);
+
+  if (opts.hooks && plan.hooks.up.length > 0) {
+    const hookEnv = envToRecord(content);
+    for (const cmd of plan.hooks.up) {
+      console.log(`  hook: ${cmd}`);
+      runHook(root, cmd, hookEnv);
+    }
+  }
+  console.log(`✓ ${plan.key} is up`);
+}
+
+export function doDown(
+  root: string,
+  config: Config,
+  state: State,
+  envName: string,
+  opts: { fork?: string; keepVolumes?: boolean; force?: boolean }
+): void {
+  const env = resolveEnv(config, envName);
+  const fork = opts.fork ?? null;
+  const key = instanceKey(envName, fork);
+  const inst = state.instances[key];
+  if (!inst) {
+    console.log(`No instance ${key} in state. Nothing to do.`);
+    return;
+  }
+
+  if (!fork) {
+    const dependents = Object.values(state.instances).filter(
+      (i) => i.env === envName && i.fork
+    );
+    if (dependents.length > 0) {
+      throw new Error(
+        `Baseline "${envName}" has live forks (${dependents
+          .map((d) => d.fork)
+          .join(", ")}). Take them down first.`
+      );
+    }
+  }
+
+  const removeVolumes = !env.persistent && !opts.keepVolumes;
+  console.log(`▼ ${key} → project ${inst.project}${removeVolumes ? " (dropping volumes)" : ""}`);
+
+  if (fork && env.hooks.forkDestroy && !opts.force) {
+    const envFilePath = path.join(root, inst.envFile);
+    if (!existsSync(envFilePath)) {
+      throw new Error(`Env file missing: ${inst.envFile}. Use --force to clean up state anyway.`);
+    }
+    const hookEnv = envToRecord(readFileSync(envFilePath, "utf8"));
+    console.log(`  forkDestroy: ${env.hooks.forkDestroy}`);
+    try {
+      runHook(root, env.hooks.forkDestroy, hookEnv);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`${msg} Use \`forkspace down ${envName} --fork ${fork} --force\` to skip forkDestroy.`);
+    }
+  } else if (fork && env.hooks.forkDestroy && opts.force) {
+    console.log(`  forkDestroy: skipped (--force)`);
+  }
+
+  if (inst.services.length > 0) {
+    composeDown(root, inst.project, removeVolumes);
+  } else {
+    console.log(`  (no container services to stop)`);
+  }
+
+  const overrideDir = path.join(root, ".forkspace", inst.project);
+  if (existsSync(overrideDir)) rmSync(overrideDir, { recursive: true });
+  const envFilePath = path.join(root, inst.envFile);
+  if (existsSync(envFilePath)) rmSync(envFilePath);
+
+  delete state.instances[key];
+  saveState(root, state);
+  console.log(`✓ ${key} is down`);
+}
+
 program
   .command("up")
   .description("Start an environment (optionally as an isolated fork)")
@@ -59,132 +232,12 @@ program
   .option("--fork <name>", "start an isolated fork of this environment")
   .option(
     "--isolate <services>",
-    "comma-separated services to isolate; others reuse baseline (overrides config isolation)"
+    "comma-separated services to run as container-isolated for this fork (overrides config isolation)"
   )
-  .option("--no-hooks", "skip bootstrap/seed hooks")
+  .option("--no-hooks", "skip lifecycle hooks")
   .action(async (envName: string, opts: { fork?: string; isolate?: string; hooks: boolean }) => {
     const { root, config, state } = ctx();
-    const env = resolveEnv(config, envName);
-    const fork = opts.fork ?? null;
-    const key = instanceKey(envName, fork);
-
-    if (state.instances[key]) {
-      console.log(`Instance ${key} already exists (project ${state.instances[key].project}).`);
-      console.log(`Run \`forkspace down ${envName}${fork ? ` --fork ${fork}` : ""}\` first, or use it as-is.`);
-      return;
-    }
-
-    // Partition services into container-isolated vs baseline-reused for THIS instance.
-    const isolateSet = opts.isolate
-      ? new Set(opts.isolate.split(",").map((s) => s.trim()))
-      : null;
-    if (isolateSet) {
-      for (const name of isolateSet) {
-        if (!env.services[name]) throw new Error(`--isolate: unknown service "${name}"`);
-      }
-    }
-    const allNames = Object.keys(env.services);
-    const containerIsolated = (name: string) =>
-      isolateSet
-        ? isolateSet.has(name)
-        : env.services[name].isolation === "container";
-
-    const ownNames = fork ? allNames.filter(containerIsolated) : allNames;
-    const sharedNames = fork ? allNames.filter((n) => !containerIsolated(n)) : [];
-
-    // A fork's shared services live in the baseline instance — make sure it exists.
-    if (fork && sharedNames.length > 0 && !state.instances[envName]) {
-      throw new Error(
-        `Fork "${fork}" shares services (${sharedNames.join(", ")}) with the baseline ` +
-          `"${envName}" instance, which isn't up. Run \`forkspace up ${envName}\` first.`
-      );
-    }
-
-    // Slot: baseline is always 0; forks get the lowest free slot >= 1.
-    const allocationBasePorts = Object.values(env.allocations).map((a) => a.basePort);
-    const slot = fork
-      ? await allocateSlot({
-          basePorts: [
-            ...ownNames.map((n) => env.services[n].basePort),
-            ...allocationBasePorts,
-          ],
-          slotSize: config.slotSize,
-          takenSlots: takenSlots(state, envName),
-          minSlot: 1,
-        })
-      : 0;
-
-    const project = projectName(config.workspace, envName, fork);
-    const planned: PlannedService[] = ownNames.map((name) => ({
-      name,
-      def: env.services[name],
-      hostPort: portFor(env.services[name].basePort, slot, config.slotSize),
-    }));
-
-    console.log(`▲ ${key} → project ${project} (slot ${slot})`);
-    for (const p of planned) {
-      console.log(`  ${p.name.padEnd(12)} :${p.hostPort}`);
-    }
-
-    const runs = planComposeRuns(root, project, planned);
-    for (const run of runs) composeUp(root, run);
-
-    // Env file covers own services at fork ports + shared services at baseline ports.
-    const baseline = state.instances[envName];
-    const entries = [
-      ...planned.map((p) => ({ name: p.name, def: p.def, hostPort: p.hostPort })),
-      ...sharedNames.map((name) => ({
-        name,
-        def: env.services[name],
-        hostPort:
-          baseline?.ports[name] ?? portFor(env.services[name].basePort, 0, config.slotSize),
-      })),
-    ];
-    const ns = nsFor(fork);
-    const allocationEntries = Object.entries(env.allocations).map(([name, def]) => ({
-      name,
-      hostPort: portFor(def.basePort, slot, config.slotSize),
-    }));
-    const content = renderEnvFile({
-      env: envName,
-      fork,
-      project,
-      ns,
-      entries,
-      allocations: allocationEntries,
-    });
-    const envFile = writeEnvFile(root, envName, fork, content);
-    console.log(`  env file → ${envFile}`);
-
-    const record: InstanceRecord = {
-      key,
-      env: envName,
-      fork,
-      slot,
-      project,
-      ports: Object.fromEntries([
-        ...entries.map((e) => [e.name, e.hostPort]),
-        ...allocationEntries.map((a) => [a.name, a.hostPort]),
-      ]),
-      services: ownNames,
-      envFile,
-      createdAt: new Date().toISOString(),
-    };
-    state.instances[key] = record;
-    saveState(root, state);
-
-    if (opts.hooks) {
-      const hookEnv = envToRecord(content);
-      if (env.hooks.bootstrap) {
-        console.log(`  bootstrap: ${env.hooks.bootstrap}`);
-        runHook(root, env.hooks.bootstrap, hookEnv);
-      }
-      if (env.hooks.seed) {
-        console.log(`  seed: ${env.hooks.seed}`);
-        runHook(root, env.hooks.seed, hookEnv);
-      }
-    }
-    console.log(`✓ ${key} is up`);
+    await doUp(root, config, state, envName, opts);
   });
 
 program
@@ -193,41 +246,10 @@ program
   .argument("<env>")
   .option("--fork <name>")
   .option("--keep-volumes", "keep volumes even for non-persistent environments")
-  .action((envName: string, opts: { fork?: string; keepVolumes?: boolean }) => {
+  .option("--force", "skip forkDestroy and clean up state anyway")
+  .action((envName: string, opts: { fork?: string; keepVolumes?: boolean; force?: boolean }) => {
     const { root, config, state } = ctx();
-    const env = resolveEnv(config, envName);
-    const fork = opts.fork ?? null;
-    const key = instanceKey(envName, fork);
-    const inst = state.instances[key];
-    if (!inst) {
-      console.log(`No instance ${key} in state. Nothing to do.`);
-      return;
-    }
-    // Refuse to drop a baseline that live forks depend on.
-    if (!fork) {
-      const dependents = Object.values(state.instances).filter(
-        (i) => i.env === envName && i.fork
-      );
-      if (dependents.length > 0) {
-        throw new Error(
-          `Baseline "${envName}" has live forks (${dependents
-            .map((d) => d.fork)
-            .join(", ")}). Take them down first.`
-        );
-      }
-    }
-    const removeVolumes = !env.persistent && !opts.keepVolumes;
-    console.log(`▼ ${key} → project ${inst.project}${removeVolumes ? " (dropping volumes)" : ""}`);
-    composeDown(root, inst.project, removeVolumes);
-
-    const overrideDir = path.join(root, ".forkspace", inst.project);
-    if (existsSync(overrideDir)) rmSync(overrideDir, { recursive: true });
-    const envFilePath = path.join(root, inst.envFile);
-    if (existsSync(envFilePath)) rmSync(envFilePath);
-
-    delete state.instances[key];
-    saveState(root, state);
-    console.log(`✓ ${key} is down`);
+    doDown(root, config, state, envName, opts);
   });
 
 program
@@ -242,14 +264,21 @@ program
       return;
     }
     for (const inst of instances) {
-      const ports = Object.entries(inst.ports)
+      const ns = inst.ns ?? "";
+      const backing = inst.backing ?? (inst.services.length > 0 ? "container" : "namespace-only");
+      const containerPorts = Object.entries(inst.ports)
         .filter(([name]) => inst.services.includes(name))
         .map(([name, port]) => `${name}:${port}`)
         .join(" ");
-      console.log(`${inst.key.padEnd(20)} slot ${inst.slot}  ${inst.project}  ${ports}`);
-      if (opts.ps) {
+      const nsLabel = ns ? `ns=${ns}` : "ns=(baseline)";
+      console.log(
+        `${inst.key.padEnd(20)} slot ${inst.slot}  ${nsLabel.padEnd(16)} ${backing.padEnd(16)} ${inst.project}  ${containerPorts}`
+      );
+      if (opts.ps && inst.services.length > 0) {
         const ps = composePs(root, inst.project);
         console.log(ps ? ps.split("\n").map((l) => `    ${l}`).join("\n") : "    (no containers)");
+      } else if (opts.ps) {
+        console.log("    (namespace-only — no containers)");
       }
     }
   });
@@ -266,7 +295,7 @@ program
     if (!inst) throw new Error(`No instance ${key}. Run \`forkspace up\` first.`);
     const file = path.join(root, inst.envFile);
     if (!existsSync(file)) throw new Error(`Env file missing: ${inst.envFile}`);
-    process.stdout.write(require("node:fs").readFileSync(file, "utf8"));
+    process.stdout.write(readFileSync(file, "utf8"));
   });
 
 program

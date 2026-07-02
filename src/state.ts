@@ -9,9 +9,13 @@ export interface InstanceRecord {
   slot: number;
   /** docker compose project name */
   project: string;
+  /** namespace token; empty for baseline */
+  ns: string;
+  /** container = compose project has containers; namespace-only = fork with no container services */
+  backing: "container" | "namespace-only";
   /** service name → host port */
   ports: Record<string, number>;
-  /** services actually running in THIS project (fork-scoped ones for forks) */
+  /** container-isolated services running in THIS project (empty for namespace-only forks) */
   services: string[];
   /** path to the generated env file, relative to root */
   envFile: string;
