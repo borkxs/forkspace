@@ -49,6 +49,7 @@ export function renderEnvFile(opts: {
       service: e.name,
       ns: opts.ns,
       _ns: opts.ns ? `_${opts.ns}` : "",
+      ns_: opts.ns ? `${opts.ns}_` : "",
     };
     for (const [k, tpl] of Object.entries(e.def.exports)) {
       lines.push(`${k}=${applyTemplate(tpl, vars)}`);

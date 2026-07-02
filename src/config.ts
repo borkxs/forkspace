@@ -25,7 +25,7 @@ export const ServiceSchema = z.object({
   isolation: z.enum(["container", "namespace", "shared"]).default("container"),
   /**
    * Extra env vars to emit into the generated env file.
-   * Values are templates: {port}, {host}, {service}, {ns}, {_ns} are substituted.
+   * Values are templates: {port}, {host}, {service}, {ns}, {_ns}, {ns_} are substituted.
    * e.g. DATABASE_URL: "mysql://root:root@{host}:{port}/app"
    */
   exports: z.record(z.string(), z.string()).default({}),
@@ -191,7 +191,9 @@ function isSharedBaselinePair(a: PortClaim, b: PortClaim): boolean {
 }
 
 function exportTemplatesUseNs(exports: Record<string, string>): boolean {
-  return Object.values(exports).some((v) => v.includes("{ns}") || v.includes("{_ns}"));
+  return Object.values(exports).some(
+    (v) => v.includes("{ns}") || v.includes("{_ns}") || v.includes("{ns_}")
+  );
 }
 
 /**

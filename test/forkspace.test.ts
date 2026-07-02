@@ -245,6 +245,7 @@ describe("env file", () => {
             isolation: "namespace",
             exports: {
               DATABASE_URL: "mysql://root:1@{host}:{port}/acme_test{_ns}",
+              TABLE_PREFIX: "{ns_}",
             },
           },
           hostPort: 3416,
@@ -254,6 +255,7 @@ describe("env file", () => {
     expect(envToRecord(forkContent).DATABASE_URL).toBe(
       "mysql://root:1@127.0.0.1:3416/acme_test_agent_a"
     );
+    expect(envToRecord(forkContent).TABLE_PREFIX).toBe("agent_a_");
 
     const baselineContent = renderEnvFile({
       env: "test",
@@ -271,6 +273,7 @@ describe("env file", () => {
             isolation: "namespace",
             exports: {
               DATABASE_URL: "mysql://root:1@{host}:{port}/acme_test{_ns}",
+              TABLE_PREFIX: "{ns_}",
             },
           },
           hostPort: 3406,
@@ -280,6 +283,7 @@ describe("env file", () => {
     expect(envToRecord(baselineContent).DATABASE_URL).toBe(
       "mysql://root:1@127.0.0.1:3406/acme_test"
     );
+    expect(envToRecord(baselineContent).TABLE_PREFIX).toBe("");
     expect(envToRecord(baselineContent).FORKSPACE_NS).toBe("");
   });
 
