@@ -4,6 +4,8 @@ import { parseConfig, checkConfig, loadConfig } from "../src/config";
 import { portFor, allocateSlot } from "../src/ports";
 import { buildOverrideYaml, groupByComposeFile } from "../src/compose";
 import { renderEnvFile, envToRecord, envFileName } from "../src/env";
+import { nsFor } from "../src/ns";
+import { portFor } from "../src/ports";
 import { instanceKey, projectName } from "../src/state";
 
 const MINIMAL_YML = `
@@ -142,6 +144,7 @@ describe("env file", () => {
       env: "test",
       fork: "agent-a",
       project: "fs-acme-test-agent-a",
+      ns: "agent_a",
       entries: [
         {
           name: "mysql",
@@ -160,13 +163,129 @@ describe("env file", () => {
     const rec = envToRecord(content);
     expect(rec.FORKSPACE_ENV).toBe("test");
     expect(rec.FORKSPACE_FORK).toBe("agent-a");
+    expect(rec.FORKSPACE_NS).toBe("agent_a");
     expect(rec.FORKSPACE_MYSQL_PORT).toBe("3416");
     expect(rec.DATABASE_URL).toBe("mysql://root:root@127.0.0.1:3416/app");
+  });
+
+  it("renders {ns} and {_ns} in export templates", () => {
+    const forkContent = renderEnvFile({
+      env: "test",
+      fork: "agent-a",
+      project: "fs-acme-test-agent-a",
+      ns: "agent_a",
+      entries: [
+        {
+          name: "mysql",
+          def: {
+            compose: "x.yml",
+            service: "db",
+            basePort: 3406,
+            containerPort: 3306,
+            isolation: "namespace",
+            exports: {
+              DATABASE_URL: "mysql://root:1@{host}:{port}/acme_test{_ns}",
+            },
+          },
+          hostPort: 3416,
+        },
+      ],
+    });
+    expect(envToRecord(forkContent).DATABASE_URL).toBe(
+      "mysql://root:1@127.0.0.1:3416/acme_test_agent_a"
+    );
+
+    const baselineContent = renderEnvFile({
+      env: "test",
+      fork: null,
+      project: "fs-acme-test",
+      ns: "",
+      entries: [
+        {
+          name: "mysql",
+          def: {
+            compose: "x.yml",
+            service: "db",
+            basePort: 3406,
+            containerPort: 3306,
+            isolation: "namespace",
+            exports: {
+              DATABASE_URL: "mysql://root:1@{host}:{port}/acme_test{_ns}",
+            },
+          },
+          hostPort: 3406,
+        },
+      ],
+    });
+    expect(envToRecord(baselineContent).DATABASE_URL).toBe(
+      "mysql://root:1@127.0.0.1:3406/acme_test"
+    );
+    expect(envToRecord(baselineContent).FORKSPACE_NS).toBe("");
+  });
+
+  it("emits allocation ports at slot-adjusted values", () => {
+    const slotSize = 10;
+    const appBase = 4100;
+
+    const baseline = renderEnvFile({
+      env: "test",
+      fork: null,
+      project: "fs-acme-test",
+      ns: "",
+      entries: [],
+      allocations: [{ name: "app", hostPort: portFor(appBase, 0, slotSize) }],
+    });
+    expect(envToRecord(baseline).FORKSPACE_APP_PORT).toBe("4100");
+
+    const fork = renderEnvFile({
+      env: "test",
+      fork: "agent-a",
+      project: "fs-acme-test-agent-a",
+      ns: "agent_a",
+      entries: [],
+      allocations: [{ name: "app", hostPort: portFor(appBase, 1, slotSize) }],
+    });
+    const rec = envToRecord(fork);
+    expect(rec.FORKSPACE_NS).toBe("agent_a");
+    expect(rec.FORKSPACE_APP_PORT).toBe("4110");
   });
 
   it("names env files by env and fork", () => {
     expect(envFileName("test", null)).toBe(".env.forkspace.test");
     expect(envFileName("test", "agent-a")).toBe(".env.forkspace.test.agent-a");
+  });
+});
+
+describe("namespace tokens", () => {
+  it("returns empty string for baseline", () => {
+    expect(nsFor(null)).toBe("");
+    expect(nsFor("")).toBe("");
+  });
+
+  it("lowercases and converts dashes to underscores", () => {
+    expect(nsFor("agent-a")).toBe("agent_a");
+    expect(nsFor("E2E-1")).toBe("e2e_1");
+  });
+
+  it("prefixes f_ when the token would start with a digit", () => {
+    expect(nsFor("1st")).toBe("f_1st");
+  });
+
+  it("strips invalid characters", () => {
+    expect(nsFor("Agent.A@2")).toBe("agenta2");
+  });
+
+  it("truncates to 32 characters", () => {
+    const long = "abcdefghijklmnopqrstuvwxyz0123456789extra";
+    expect(long.length).toBeGreaterThan(32);
+    expect(nsFor(long)).toBe("abcdefghijklmnopqrstuvwxyz012345");
+    expect(nsFor(long).length).toBe(32);
+  });
+
+  it("truncates after f_ prefix when needed", () => {
+    const long = "1" + "a".repeat(40);
+    expect(nsFor(long)).toBe(`f_1${"a".repeat(29)}`);
+    expect(nsFor(long).length).toBe(32);
   });
 });
 

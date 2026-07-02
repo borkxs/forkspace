@@ -28,6 +28,7 @@ import {
   type PlannedService,
 } from "./compose";
 import { envToRecord, renderEnvFile, writeEnvFile } from "./env";
+import { nsFor } from "./ns";
 
 const program = new Command();
 program
@@ -100,9 +101,13 @@ program
     }
 
     // Slot: baseline is always 0; forks get the lowest free slot >= 1.
+    const allocationBasePorts = Object.values(env.allocations).map((a) => a.basePort);
     const slot = fork
       ? await allocateSlot({
-          basePorts: ownNames.map((n) => env.services[n].basePort),
+          basePorts: [
+            ...ownNames.map((n) => env.services[n].basePort),
+            ...allocationBasePorts,
+          ],
           slotSize: config.slotSize,
           takenSlots: takenSlots(state, envName),
           minSlot: 1,
@@ -135,7 +140,19 @@ program
           baseline?.ports[name] ?? portFor(env.services[name].basePort, 0, config.slotSize),
       })),
     ];
-    const content = renderEnvFile({ env: envName, fork, project, entries });
+    const ns = nsFor(fork);
+    const allocationEntries = Object.entries(env.allocations).map(([name, def]) => ({
+      name,
+      hostPort: portFor(def.basePort, slot, config.slotSize),
+    }));
+    const content = renderEnvFile({
+      env: envName,
+      fork,
+      project,
+      ns,
+      entries,
+      allocations: allocationEntries,
+    });
     const envFile = writeEnvFile(root, envName, fork, content);
     console.log(`  env file → ${envFile}`);
 
@@ -145,7 +162,10 @@ program
       fork,
       slot,
       project,
-      ports: Object.fromEntries(entries.map((e) => [e.name, e.hostPort])),
+      ports: Object.fromEntries([
+        ...entries.map((e) => [e.name, e.hostPort]),
+        ...allocationEntries.map((a) => [a.name, a.hostPort]),
+      ]),
       services: ownNames,
       envFile,
       createdAt: new Date().toISOString(),
