@@ -97,3 +97,4 @@ environments:
       seed: npm --prefix my-api run local:seed-test
       forkCreate: my-api/scripts/fork-create.sh
       forkDestroy: my-api/scripts/fork-destroy.sh
+      listNamespaces: my-api/scripts/list-namespaces.sh

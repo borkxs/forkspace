@@ -1,6 +1,6 @@
 {
   "name": "forkspace",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Isolated local dev/test environments for multi-repo compose stacks. Fork your stack per agent or branch.",
   "license": "MIT",
   "bin": {

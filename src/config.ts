@@ -56,6 +56,12 @@ export const HooksSchema = z
      * Use for engine-specific namespace/database cleanup.
      */
     forkDestroy: z.string().optional(),
+    /**
+     * Command that prints one namespace token per line to stdout.
+     * Used by `forkspace ls --orphans` to diff engine state against
+     * recorded fork instances.
+     */
+    listNamespaces: z.string().optional(),
   })
   .default({});
 

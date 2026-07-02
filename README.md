@@ -21,24 +21,49 @@ namespace. Two agents running tests against "the" local database corrupt each
 other's feedback loops. Full per-workspace VMs or sandboxed Docker daemons solve
 this with a sledgehammer; most stacks just need their compose services forked.
 
-`forkspace` is the lightweight middle: a workspace-level compose manager built
-on `docker compose -p` as the isolation primitive.
+`forkspace` is the lightweight middle: a workspace-level compose manager that
+lets you **choose your isolation level per service** — container, namespace, or
+shared — instead of duplicating everything or sharing everything.
 
-- **Named environments** (`dev`, `test`) with different lifecycle rules —
-  `dev` is persistent, `test` is ephemeral and seeded on `up`.
-- **Forking** — `--fork agent-a` gets its own compose project, its own named
-  volumes (free with `-p`), and deterministic ports one slot up
-  (`basePort + slot × slotSize`).
-- **Shared vs. forked services per environment** — usually only the SQL schema
-  diverges between branches; mark DynamoDB/queues/object storage `scope: shared`
-  and forks reuse the baseline containers instead of duplicating everything.
-- **Cross-repo service ownership** — when two repos' compose files both claim
-  DynamoDB on port 8000 with incompatible configs, `forkspace.yml` names one
-  owner and the other is never started. `forkspace check` detects the conflicts.
-- **An env-file contract** — every instance writes `.env.forkspace.<env>[.<fork>]`
-  with `FORKSPACE_*_PORT/_HOST` plus your own templated exports
-  (`DATABASE_URL: "mysql://root:root@{host}:{port}/app"`). Apps, tests, CI, and
-  agents all consume the same contract.
+## Choose your isolation level
+
+Each service in an environment declares an `isolation` level:
+
+| Level | What the fork gets | When to use |
+|---|---|---|
+| `container` | Its own compose service instance (own container, volumes, host port) | Full data isolation — separate MySQL instance per fork |
+| `namespace` | A namespace token inside the baseline's service (own database, table prefix, etc.) | Schema/data isolation without extra containers |
+| `shared` | The baseline service as-is | DynamoDB, queues, object storage that don't need per-fork copies |
+
+Typical test setup: MySQL is `namespace`, everything else is `shared`. One
+baseline MySQL container; each `--fork` gets its own database name derived from
+the fork name.
+
+```yaml
+services:
+  mysql:
+    isolation: namespace
+    exports:
+      DATABASE_URL: "mysql://root:root@{host}:{port}/{ns}"
+  dynamodb:
+    isolation: shared
+    exports:
+      DYNAMO_ENDPOINT: "http://{host}:{port}"
+```
+
+### Tenancy framing
+
+forkspace is the **naming authority**, not a database driver. It mints the
+namespace token, exposes it in export templates (`{ns}`, `{_ns}`) and as
+`FORKSPACE_NS` in the env file, and calls lifecycle hooks. All engine-specific
+create/drop/list logic lives in your repo scripts.
+
+**Boundary rule:** forkspace owns names, addresses, and lifecycle; your repos
+own processes and engine-specific SQL/SDK calls.
+
+Namespace tokens are derived from the fork name: lowercase `[a-z0-9_]+`, dashes
+→ underscores, prefixed with `f_` if they would start with a digit, max 32
+characters. Empty for the baseline.
 
 ## Install
 
@@ -57,26 +82,60 @@ forkspace init      # writes a starter forkspace.yml
 forkspace check     # validates compose files, services, and port math
 ```
 
-See `forkspace.example.yml` for a full multi-repo example with fork/shared
-scoping and bootstrap/seed hooks.
+See `forkspace.example.yml` for a full multi-repo example with per-service
+isolation levels, allocations, and lifecycle hooks.
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `up <env> [--fork <name>] [--isolate <svcs>] [--no-hooks]` | Start an instance. `--isolate mysql` forks only MySQL and shares the rest, overriding config scope. |
-| `down <env> [--fork <name>] [--keep-volumes]` | Stop an instance. Drops volumes unless the environment is `persistent`. Refuses to drop a baseline with live forks. |
-| `ls [--ps]` | List instances, slots, ports; `--ps` queries docker for container status. |
+| `up <env> [--fork <name>] [--isolate <svcs>] [--no-hooks]` | Start an instance. Baseline runs `bootstrap → seed`; forks run `forkCreate → seed`. `--isolate mysql` forces listed services to `container` isolation for this fork. |
+| `down <env> [--fork <name>] [--keep-volumes] [--force]` | Stop an instance. Forks run `forkDestroy` first. Drops volumes unless the environment is `persistent`. Refuses to drop a baseline with live forks. `--force` skips `forkDestroy` and cleans up state anyway. |
+| `ls [--ps] [--orphans]` | List instances, slots, namespace tokens, and ports. `--ps` queries docker for container status. `--orphans` diffs recorded fork namespaces against `hooks.listNamespaces` output. |
 | `env <env> [--fork <name>]` | Print the instance's env file (pipe into `source`). |
-| `check` | Static validation: compose files exist, services exist, no basePort collisions, no slot-range overlaps. |
+| `check` | Workspace-wide validation: compose files exist, services exist, no basePort collisions across environments, no slot-range overlaps. Warns on reserved `FORKSPACE_` export keys and namespace services missing `{ns}` templates. |
 | `init` | Write a starter `forkspace.yml`. |
 
-## How isolation works
+## Lifecycle hooks
+
+Hooks are shell commands run with the instance env file loaded:
+
+| Hook | When | Purpose |
+|---|---|---|
+| `bootstrap` | Baseline `up` | Create tables, queues, buckets in the baseline |
+| `seed` | Every `up` | Load test data |
+| `forkCreate` | Fork `up` | Engine-specific namespace/database creation |
+| `forkDestroy` | Fork `down` (before teardown) | Engine-specific namespace cleanup |
+| `listNamespaces` | `ls --orphans` | Print one namespace token per line to stdout |
+
+forkspace cannot query databases itself — `listNamespaces` is the convention
+for orphan detection. With the hook configured, `ls --orphans` reports:
+
+- **orphans** — namespaces that exist in the engine but not in forkspace state
+- **ghosts** — namespaces recorded in state but missing from the engine
+
+When the hook is absent or the baseline is not up, orphan detection degrades
+gracefully with a skip message.
+
+## Env file contract
+
+Every instance writes `.env.forkspace.<env>[.<fork>]` with:
+
+- `FORKSPACE_ENV`, `FORKSPACE_FORK`, `FORKSPACE_NS`, `FORKSPACE_<SERVICE>_PORT`,
+  `FORKSPACE_<SERVICE>_HOST`
+- `FORKSPACE_<ALLOCATION>_PORT` for named port allocations (reserved slots
+  forkspace exports but does not start processes for)
+- Your templated exports (`DATABASE_URL`, etc.) with `{host}`, `{port}`, `{ns}`,
+  `{_ns}` substituted
+
+Apps, tests, CI, and agents all consume the same contract.
+
+## How ports and slots work
 
 Each instance is a docker compose project named `fs-<workspace>-<env>[-<fork>]`.
 
 - **Networks and volumes**: compose prefixes both with the project name, so
-  forks get fresh data directories with zero configuration.
+  container-isolated forks get fresh data directories with zero configuration.
 - **Ports**: forkspace generates a per-instance override file using compose's
   `!override` tag (compose ≥ 2.24) that remaps only host ports:
 
@@ -89,7 +148,11 @@ Each instance is a docker compose project named `fs-<workspace>-<env>[-<fork>]`.
 
 - **Slots**: the baseline is slot 0; forks take the lowest free slot ≥ 1,
   probed against both recorded state (`.forkspace/state.json`) and actual
-  host port availability.
+  host port availability. Port math: `basePort + slot × slotSize`.
+
+`forkspace check` validates port claims **workspace-wide** — baselines of
+different environments coexist on one machine, so collisions are checked across
+all environments, not just within one.
 
 ## CI
 
@@ -105,6 +168,9 @@ truth for what "test environment" means everywhere.
   untrusted agents.
 - Not a compose replacement. Your repos keep their compose files; forkspace
   orchestrates them.
+- Not a database driver. forkspace mints namespace tokens and calls hooks;
+  your scripts own `CREATE DATABASE`, DynamoDB table prefixes, S3 bucket
+  naming, and anything engine-specific.
 
 ## Positioning
 

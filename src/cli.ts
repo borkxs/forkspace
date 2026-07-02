@@ -28,12 +28,19 @@ import {
 } from "./compose";
 import { envToRecord, renderEnvFile, writeEnvFile } from "./env";
 import { planInstance, planSlotProbe } from "./plan";
+import {
+  hasListNamespacesHook,
+  orphanReports,
+  type OrphanReport,
+} from "./orphans";
+
+const VERSION = "0.2.0";
 
 const program = new Command();
 program
   .name("forkspace")
   .description("Isolated local dev/test environments for multi-repo compose stacks")
-  .version("0.1.0");
+  .version(VERSION);
 
 function ctx() {
   const root = findRoot(process.cwd());
@@ -225,6 +232,61 @@ export function doDown(
   console.log(`✓ ${key} is down`);
 }
 
+function loadInstanceEnv(root: string, envFileRel: string): Record<string, string> {
+  const envFilePath = path.join(root, envFileRel);
+  if (!existsSync(envFilePath)) {
+    throw new Error(`Env file missing: ${envFileRel}`);
+  }
+  return envToRecord(readFileSync(envFilePath, "utf8"));
+}
+
+export function printOrphanReports(reports: OrphanReport[]): void {
+  for (const report of reports) {
+    console.log(`${report.env}:`);
+    if (report.skip) {
+      console.log(`  (skipped: ${report.skip})`);
+      continue;
+    }
+    const { orphans, ghosts } = report.diff!;
+    if (orphans.length === 0 && ghosts.length === 0) {
+      console.log("  ✓ namespaces in sync");
+      continue;
+    }
+    for (const ns of orphans) {
+      console.log(`  orphan  ${ns}  (in engine, not in state)`);
+    }
+    for (const ns of ghosts) {
+      console.log(`  ghost   ${ns}  (in state, not in engine)`);
+    }
+  }
+}
+
+function listInstances(root: string, state: State, ps: boolean): void {
+  const instances = Object.values(state.instances);
+  if (instances.length === 0) {
+    console.log("No instances. `forkspace up <env>` to start one.");
+    return;
+  }
+  for (const inst of instances) {
+    const ns = inst.ns ?? "";
+    const backing = inst.backing ?? (inst.services.length > 0 ? "container" : "namespace-only");
+    const containerPorts = Object.entries(inst.ports)
+      .filter(([name]) => inst.services.includes(name))
+      .map(([name, port]) => `${name}:${port}`)
+      .join(" ");
+    const nsLabel = ns ? `ns=${ns}` : "ns=(baseline)";
+    console.log(
+      `${inst.key.padEnd(20)} slot ${inst.slot}  ${nsLabel.padEnd(16)} ${backing.padEnd(16)} ${inst.project}  ${containerPorts}`
+    );
+    if (ps && inst.services.length > 0) {
+      const psOut = composePs(root, inst.project);
+      console.log(psOut ? psOut.split("\n").map((l) => `    ${l}`).join("\n") : "    (no containers)");
+    } else if (ps) {
+      console.log("    (namespace-only — no containers)");
+    }
+  }
+}
+
 program
   .command("up")
   .description("Start an environment (optionally as an isolated fork)")
@@ -256,30 +318,29 @@ program
   .command("ls")
   .description("List instances")
   .option("--ps", "also query docker for container status")
-  .action((opts: { ps?: boolean }) => {
-    const { root, state } = ctx();
-    const instances = Object.values(state.instances);
-    if (instances.length === 0) {
-      console.log("No instances. `forkspace up <env>` to start one.");
-      return;
-    }
-    for (const inst of instances) {
-      const ns = inst.ns ?? "";
-      const backing = inst.backing ?? (inst.services.length > 0 ? "container" : "namespace-only");
-      const containerPorts = Object.entries(inst.ports)
-        .filter(([name]) => inst.services.includes(name))
-        .map(([name, port]) => `${name}:${port}`)
-        .join(" ");
-      const nsLabel = ns ? `ns=${ns}` : "ns=(baseline)";
-      console.log(
-        `${inst.key.padEnd(20)} slot ${inst.slot}  ${nsLabel.padEnd(16)} ${backing.padEnd(16)} ${inst.project}  ${containerPorts}`
-      );
-      if (opts.ps && inst.services.length > 0) {
-        const ps = composePs(root, inst.project);
-        console.log(ps ? ps.split("\n").map((l) => `    ${l}`).join("\n") : "    (no containers)");
-      } else if (opts.ps) {
-        console.log("    (namespace-only — no containers)");
+  .option(
+    "--orphans",
+    "diff namespace-isolated forks against hooks.listNamespaces (requires baseline up)"
+  )
+  .action((opts: { ps?: boolean; orphans?: boolean }) => {
+    const { root, config, state } = ctx();
+
+    if (opts.orphans) {
+      if (!hasListNamespacesHook(config)) {
+        console.log(
+          "No listNamespaces hook configured. Add hooks.listNamespaces to an environment " +
+            "in forkspace.yml to enable orphan detection."
+        );
+      } else {
+        printOrphanReports(
+          orphanReports(config, state, root, (envFileRel) => loadInstanceEnv(root, envFileRel))
+        );
       }
+      if (Object.values(state.instances).length > 0) console.log("");
+    }
+
+    if (!opts.orphans || Object.values(state.instances).length > 0) {
+      listInstances(root, state, !!opts.ps);
     }
   });
 
@@ -366,6 +427,7 @@ environments:
       seed: npm run db:seed-test
       forkCreate: ./scripts/fork-create.sh
       forkDestroy: ./scripts/fork-destroy.sh
+      listNamespaces: ./scripts/list-namespaces.sh
 `;
 
 program.parseAsync().catch((err: unknown) => {

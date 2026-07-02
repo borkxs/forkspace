@@ -11,6 +11,12 @@ import {
   planInstance,
   planSlotProbe,
 } from "../src/plan";
+import {
+  diffNamespaces,
+  namespacesInState,
+  orphanReports,
+  parseNamespaceLines,
+} from "../src/orphans";
 
 const MINIMAL_YML = `
 workspace: acme
@@ -62,6 +68,24 @@ environments:
     expect(cfg.environments.test.allocations.app.basePort).toBe(4100);
     expect(cfg.environments.test.hooks.forkCreate).toBe("./scripts/fork-create.sh");
     expect(cfg.environments.test.hooks.forkDestroy).toBe("./scripts/fork-destroy.sh");
+  });
+
+  it("parses listNamespaces hook", () => {
+    const yml = `
+workspace: app
+environments:
+  test:
+    services:
+      mysql:
+        compose: api/docker-compose.yml
+        service: db
+        basePort: 3406
+        containerPort: 3306
+    hooks:
+      listNamespaces: ./scripts/list-namespaces.sh
+`;
+    const cfg = parseConfig(yml);
+    expect(cfg.environments.test.hooks.listNamespaces).toBe("./scripts/list-namespaces.sh");
   });
 
   it("rejects legacy scope keys with a migration hint", () => {
@@ -522,5 +546,139 @@ describe("planInstance", () => {
     });
     expect(plan.containersToStart.map((s) => s.name)).toEqual(["mysql"]);
     expect(plan.baselineDependentServices).toEqual(["dynamodb"]);
+  });
+});
+
+describe("orphan detection", () => {
+  it("parseNamespaceLines ignores blank lines", () => {
+    expect([...parseNamespaceLines("agent_a\n\ne2e_1\n")].sort()).toEqual(["agent_a", "e2e_1"]);
+  });
+
+  it("namespacesInState collects fork ns tokens only", () => {
+    const state: State = {
+      instances: {
+        test: {
+          key: "test",
+          env: "test",
+          fork: null,
+          slot: 0,
+          project: "fs-acme-test",
+          ns: "",
+          backing: "container",
+          ports: {},
+          services: ["mysql"],
+          envFile: ".env.forkspace.test",
+          createdAt: "",
+        },
+        "test@agent-a": {
+          key: "test@agent-a",
+          env: "test",
+          fork: "agent-a",
+          slot: 1,
+          project: "fs-acme-test-agent-a",
+          ns: "agent_a",
+          backing: "namespace-only",
+          ports: {},
+          services: [],
+          envFile: ".env.forkspace.test.agent-a",
+          createdAt: "",
+        },
+        "test@ghost": {
+          key: "test@ghost",
+          env: "test",
+          fork: "ghost",
+          slot: 2,
+          project: "fs-acme-test-ghost",
+          ns: "ghost",
+          backing: "namespace-only",
+          ports: {},
+          services: [],
+          envFile: ".env.forkspace.test.ghost",
+          createdAt: "",
+        },
+      },
+    };
+    expect([...namespacesInState(state, "test")].sort()).toEqual(["agent_a", "ghost"]);
+    expect([...namespacesInState(state, "dev")]).toEqual([]);
+  });
+
+  it("diffNamespaces finds orphans and ghosts", () => {
+    const engine = new Set(["agent_a", "stale_ns"]);
+    const recorded = new Set(["agent_a", "ghost"]);
+    expect(diffNamespaces(engine, recorded)).toEqual({
+      orphans: ["stale_ns"],
+      ghosts: ["ghost"],
+    });
+  });
+
+  it("orphanReports skips when baseline is not up", () => {
+    const config = parseConfig(`
+workspace: app
+environments:
+  test:
+    services:
+      mysql:
+        compose: api/docker-compose.yml
+        service: db
+        basePort: 3406
+        containerPort: 3306
+    hooks:
+      listNamespaces: echo agent_a
+`);
+    const reports = orphanReports(config, { instances: {} }, "/tmp", () => ({}));
+    expect(reports).toEqual([
+      { env: "test", skip: "baseline not up — run `forkspace up` first" },
+    ]);
+  });
+
+  it("orphanReports diffs hook output against state", () => {
+    const config = parseConfig(`
+workspace: app
+environments:
+  test:
+    services:
+      mysql:
+        compose: api/docker-compose.yml
+        service: db
+        basePort: 3406
+        containerPort: 3306
+    hooks:
+      listNamespaces: echo agent_a
+`);
+    const state: State = {
+      instances: {
+        test: {
+          key: "test",
+          env: "test",
+          fork: null,
+          slot: 0,
+          project: "fs-app-test",
+          ns: "",
+          backing: "container",
+          ports: {},
+          services: ["mysql"],
+          envFile: ".env.forkspace.test",
+          createdAt: "",
+        },
+        "test@ghost": {
+          key: "test@ghost",
+          env: "test",
+          fork: "ghost",
+          slot: 1,
+          project: "fs-app-test-ghost",
+          ns: "ghost",
+          backing: "namespace-only",
+          ports: {},
+          services: [],
+          envFile: ".env.forkspace.test.ghost",
+          createdAt: "",
+        },
+      },
+    };
+    const reports = orphanReports(config, state, "/tmp", () => ({
+      FORKSPACE_ENV: "test",
+    }));
+    expect(reports).toHaveLength(1);
+    expect(reports[0].diff).toEqual({ orphans: ["agent_a"], ghosts: ["ghost"] });
   });
 });

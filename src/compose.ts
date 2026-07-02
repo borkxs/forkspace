@@ -112,19 +112,42 @@ function exec(cwd: string, args: string[]): void {
   }
 }
 
+function spawnHook(
+  root: string,
+  command: string,
+  extraEnv: Record<string, string>,
+  stdio: "inherit" | "pipe"
+) {
+  return spawnSync(command, {
+    cwd: root,
+    shell: true,
+    stdio,
+    encoding: stdio === "pipe" ? "utf8" : undefined,
+    env: { ...process.env, ...extraEnv },
+  });
+}
+
 /** Run a hook command with the instance's env vars loaded. */
 export function runHook(
   root: string,
   command: string,
   extraEnv: Record<string, string>
 ): void {
-  const res = spawnSync(command, {
-    cwd: root,
-    shell: true,
-    stdio: "inherit",
-    env: { ...process.env, ...extraEnv },
-  });
+  const res = spawnHook(root, command, extraEnv, "inherit");
   if (res.status !== 0) {
     throw new Error(`Hook failed (exit ${res.status}): ${command}`);
   }
+}
+
+/** Run a hook and return stdout (for listNamespaces and similar). */
+export function runHookCapture(
+  root: string,
+  command: string,
+  extraEnv: Record<string, string>
+): string {
+  const res = spawnHook(root, command, extraEnv, "pipe");
+  if (res.status !== 0) {
+    throw new Error(`Hook failed (exit ${res.status}): ${command}`);
+  }
+  return typeof res.stdout === "string" ? res.stdout : "";
 }
