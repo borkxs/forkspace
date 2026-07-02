@@ -1,0 +1,94 @@
+# Example forkspace.yml for a workspace shaped like:
+#
+#   ~/git/sb/
+#     forkspace.yml          ← this file (workspace root)
+#     my-api/
+#       docker-compose.yml   ← defines db, dynamodb, elasticmq, minio
+#     cdk/
+#       docker-compose.yml   ← ALSO defines dynamodb on 8000 (the conflict)
+#
+# forkspace resolves the conflict by making ownership explicit: only the
+# services listed here are ever started, from the compose file named here.
+# The cdk repo's dynamodb is simply never used.
+
+workspace: acme
+slotSize: 10
+
+environments:
+  # Your working environment. Survives restarts, `down` keeps volumes.
+  dev:
+    persistent: true
+    services:
+      mysql:
+        compose: my-api/docker-compose.yml
+        service: db
+        basePort: 3306
+        containerPort: 3306
+        exports:
+          DATABASE_URL: "mysql://root:root@{host}:{port}/acmepay"
+      dynamodb:
+        compose: my-api/docker-compose.yml
+        service: dynamodb
+        basePort: 8000
+        containerPort: 8000
+        exports:
+          DYNAMO_ENDPOINT: "http://{host}:{port}"
+      queue:
+        compose: my-api/docker-compose.yml
+        service: elasticmq
+        basePort: 9324
+        containerPort: 9324
+        exports:
+          SQS_ENDPOINT: "http://{host}:{port}"
+      s3:
+        compose: my-api/docker-compose.yml
+        service: minio
+        basePort: 9000
+        containerPort: 9000
+        exports:
+          S3_ENDPOINT: "http://{host}:{port}"
+
+  # Clean, seeded, ephemeral. `forkspace up test --fork agent-a` gives each
+  # agent its own MySQL while sharing dynamo/queue/s3 with the test baseline —
+  # the --db-only insight, expressed as per-service scope.
+  test:
+    persistent: false
+    services:
+      mysql:
+        compose: my-api/docker-compose.yml
+        service: db
+        basePort: 3406
+        containerPort: 3306
+        scope: fork
+        exports:
+          DATABASE_URL: "mysql://root:root@{host}:{port}/acmepay_test"
+      dynamodb:
+        compose: my-api/docker-compose.yml
+        service: dynamodb
+        basePort: 8100
+        containerPort: 8000
+        scope: shared
+        exports:
+          DYNAMO_ENDPOINT: "http://{host}:{port}"
+      queue:
+        compose: my-api/docker-compose.yml
+        service: elasticmq
+        basePort: 9424
+        containerPort: 9324
+        scope: shared
+        exports:
+          SQS_ENDPOINT: "http://{host}:{port}"
+      s3:
+        compose: my-api/docker-compose.yml
+        service: minio
+        basePort: 9100
+        containerPort: 9000
+        scope: shared
+        exports:
+          S3_ENDPOINT: "http://{host}:{port}"
+    hooks:
+      # Table/queue/bucket creation. Deliberately just a command so the
+      # CDK-vs-Dynamoose source-of-truth question doesn't block the tool —
+      # point it at whichever answer the agent scan lands on.
+      bootstrap: npm --prefix my-api run local:bootstrap
+      seed: npm --prefix my-api run local:seed-test
