@@ -51,7 +51,7 @@ environments:
       dynamodb:
         compose: my-api/docker-compose.yml
         service: dynamodb
-        basePort: 8100
+        basePort: 8000
         containerPort: 8000
         isolation: shared
         exports:

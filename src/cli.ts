@@ -303,12 +303,14 @@ program
   .description("Validate forkspace.yml against the workspace (compose files, services, port conflicts)")
   .action(() => {
     const { root, config } = ctx();
-    const problems = checkConfig(config, root);
-    if (problems.length === 0) {
-      console.log("✓ config OK");
+    const { errors, warnings } = checkConfig(config, root);
+    for (const w of warnings) console.warn(`⚠ ${w}`);
+    if (errors.length === 0) {
+      const suffix = warnings.length ? ` (${warnings.length} warning${warnings.length === 1 ? "" : "s"})` : "";
+      console.log(`✓ config OK${suffix}`);
       return;
     }
-    for (const p of problems) console.error(`✗ ${p}`);
+    for (const p of errors) console.error(`✗ ${p}`);
     process.exitCode = 1;
   });
 

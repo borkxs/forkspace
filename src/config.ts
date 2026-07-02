@@ -154,63 +154,131 @@ export function loadConfig(root: string): Config {
   return parseConfig(readFileSync(file, "utf8"));
 }
 
+export interface CheckResult {
+  errors: string[];
+  warnings: string[];
+}
+
+/** Compose file + service identity for shared-baseline port claims. */
+type PortClaim = {
+  env: string;
+  label: string;
+  basePort: number;
+  compose?: string;
+  service?: string;
+};
+
+function composeServiceKey(claim: PortClaim): string | null {
+  if (claim.compose && claim.service) return `${claim.compose}\0${claim.service}`;
+  return null;
+}
+
+/** Same compose file + service identity for shared-baseline port claims. */
+function sameComposeService(a: PortClaim, b: PortClaim): boolean {
+  const ka = composeServiceKey(a);
+  return ka !== null && ka === composeServiceKey(b);
+}
+
+/** Same basePort is allowed only for the same compose service shared across environments. */
+function isSharedBaselinePair(a: PortClaim, b: PortClaim): boolean {
+  return sameComposeService(a, b) && a.basePort === b.basePort;
+}
+
+function exportTemplatesUseNs(exports: Record<string, string>): boolean {
+  return Object.values(exports).some((v) => v.includes("{ns}") || v.includes("{_ns}"));
+}
+
 /**
  * Static validation of a config against the filesystem and itself:
  *  - referenced compose files exist and define the referenced services
- *  - no two services in one environment claim the same basePort
- *  - fork port ranges of distinct services can't collide within slotSize slots
+ *  - port claims are workspace-global (services + allocations)
+ *  - fork port ranges can't collide across environments unless sharing one baseline
+ *  - exports keys must not use the reserved FORKSPACE_ prefix (warning)
+ *  - namespace-isolated services should reference {ns} or {_ns} in exports (warning)
  */
-export function checkConfig(config: Config, root: string): string[] {
-  const problems: string[] = [];
+export function checkConfig(config: Config, root: string): CheckResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const claims: PortClaim[] = [];
 
   for (const [envName, env] of Object.entries(config.environments)) {
-    const portOwner = new Map<number, string>();
     for (const [svcName, svc] of Object.entries(env.services)) {
-      // compose file exists?
       const composePath = path.join(root, svc.compose);
       if (!existsSync(composePath)) {
-        problems.push(`${envName}.${svcName}: compose file not found: ${svc.compose}`);
+        errors.push(`${envName}.${svcName}: compose file not found: ${svc.compose}`);
       } else {
         try {
           const doc = parse(readFileSync(composePath, "utf8"));
           if (!doc?.services?.[svc.service]) {
-            problems.push(
+            errors.push(
               `${envName}.${svcName}: service "${svc.service}" not defined in ${svc.compose}`
             );
           }
         } catch (e) {
-          problems.push(`${envName}.${svcName}: failed to parse ${svc.compose}: ${e}`);
+          errors.push(`${envName}.${svcName}: failed to parse ${svc.compose}: ${e}`);
         }
       }
-      // basePort collision inside this environment
-      const owner = portOwner.get(svc.basePort);
-      if (owner) {
-        problems.push(
-          `${envName}: services "${owner}" and "${svcName}" both claim basePort ${svc.basePort} — ` +
-            `this is the cross-repo conflict forkspace exists to prevent; pick one owner.`
-        );
-      }
-      portOwner.set(svc.basePort, svcName);
-    }
-    // slot-range overlap: two services whose basePorts are closer than the
-    // number of ports a realistic fork count would consume is fine as long
-    // as they never land on the same port for the same slot; equal spacing
-    // means collision iff |basePortA - basePortB| % slotSize === 0 and they differ.
-    const entries = Object.entries(env.services);
-    for (let i = 0; i < entries.length; i++) {
-      for (let j = i + 1; j < entries.length; j++) {
-        const [aName, a] = entries[i];
-        const [bName, b] = entries[j];
-        const diff = Math.abs(a.basePort - b.basePort);
-        if (diff !== 0 && diff % config.slotSize === 0 && diff < config.slotSize * 32) {
-          problems.push(
-            `${envName}: "${aName}" (${a.basePort}) and "${bName}" (${b.basePort}) are ` +
-              `${diff} apart, a multiple of slotSize ${config.slotSize} — fork slot ` +
-              `${diff / config.slotSize} of one collides with the other's baseline.`
+
+      claims.push({
+        env: envName,
+        label: `${envName}.${svcName}`,
+        basePort: svc.basePort,
+        compose: svc.compose,
+        service: svc.service,
+      });
+
+      for (const key of Object.keys(svc.exports)) {
+        if (key.startsWith("FORKSPACE_")) {
+          warnings.push(
+            `${envName}.${svcName}: export key "${key}" uses the reserved FORKSPACE_ prefix — ` +
+              `forkspace owns that namespace for generated vars.`
           );
         }
       }
+
+      if (svc.isolation === "namespace" && !exportTemplatesUseNs(svc.exports)) {
+        warnings.push(
+          `${envName}.${svcName}: namespace isolation but exports omit {ns}/{_ns} — ` +
+            `forks would silently share the baseline namespace.`
+        );
+      }
+    }
+
+    for (const [allocName, alloc] of Object.entries(env.allocations)) {
+      claims.push({
+        env: envName,
+        label: `${envName}.allocations.${allocName}`,
+        basePort: alloc.basePort,
+      });
     }
   }
-  return problems;
+
+  for (let i = 0; i < claims.length; i++) {
+    for (let j = i + 1; j < claims.length; j++) {
+      const a = claims[i];
+      const b = claims[j];
+      if (isSharedBaselinePair(a, b)) continue;
+
+      if (a.basePort === b.basePort) {
+        errors.push(
+          `"${a.label}" and "${b.label}" both claim basePort ${a.basePort} — ` +
+            `only the same compose service may share a port across environments.`
+        );
+        continue;
+      }
+
+      if (sameComposeService(a, b)) continue;
+
+      const diff = Math.abs(a.basePort - b.basePort);
+      if (diff % config.slotSize === 0 && diff < config.slotSize * 32) {
+        errors.push(
+          `"${a.label}" (${a.basePort}) and "${b.label}" (${b.basePort}) are ` +
+            `${diff} apart, a multiple of slotSize ${config.slotSize} — fork slot ` +
+            `${diff / config.slotSize} of one collides with the other's baseline.`
+        );
+      }
+    }
+  }
+
+  return { errors, warnings };
 }

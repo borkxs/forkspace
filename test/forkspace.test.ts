@@ -79,7 +79,39 @@ environments:
   it("check passes against fixture workspace", () => {
     const root = path.join(__dirname, "fixtures", "workspace");
     const config = loadConfig(root);
-    expect(checkConfig(config, root)).toEqual([]);
+    expect(checkConfig(config, root)).toEqual({ errors: [], warnings: [] });
+  });
+
+  it("allows the same compose service on the same basePort across environments", () => {
+    const root = path.join(__dirname, "fixtures", "workspace");
+    const config = loadConfig(root);
+    const { errors } = checkConfig(config, root);
+    expect(errors.filter((e) => e.includes("8000"))).toEqual([]);
+  });
+
+  it("flags different services claiming the same basePort across environments", () => {
+    const root = path.join(__dirname, "fixtures", "workspace");
+    const config = loadConfig(root);
+    config.environments.test.services.queue.basePort = 8000;
+    const { errors } = checkConfig(config, root);
+    expect(errors.some((e) => e.includes("8000"))).toBe(true);
+  });
+
+  it("warns on FORKSPACE_ export keys", () => {
+    const root = path.join(__dirname, "fixtures", "workspace");
+    const config = loadConfig(root);
+    config.environments.test.services.mysql.exports.FORKSPACE_CUSTOM = "oops";
+    const { warnings } = checkConfig(config, root);
+    expect(warnings.some((w) => w.includes("FORKSPACE_CUSTOM"))).toBe(true);
+  });
+
+  it("warns when namespace exports omit {ns}/{_ns}", () => {
+    const root = path.join(__dirname, "fixtures", "workspace");
+    const config = loadConfig(root);
+    config.environments.test.services.mysql.exports.DATABASE_URL =
+      "mysql://root:root@{host}:{port}/acmepay";
+    const { warnings } = checkConfig(config, root);
+    expect(warnings.some((w) => w.includes("namespace isolation"))).toBe(true);
   });
 });
 
