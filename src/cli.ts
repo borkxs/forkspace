@@ -26,8 +26,9 @@ import {
   planComposeRuns,
   runHook,
 } from "./compose";
-import { envToRecord, renderEnvFile, writeEnvFile } from "./env";
-import { planInstance, planSlotProbe } from "./plan";
+import { envToRecord, envFileName, renderEnvFile, writeEnvFile } from "./env";
+import { withStateLock } from "./lock";
+import { planInstance, planSlotProbe, type InstancePlan } from "./plan";
 import {
   hasListNamespacesHook,
   orphanReports,
@@ -73,46 +74,101 @@ function parseIsolateSet(
 export async function doUp(
   root: string,
   config: Config,
-  state: State,
   envName: string,
   opts: { fork?: string; isolate?: string; hooks: boolean }
 ): Promise<void> {
   const env = resolveEnv(config, envName);
   const fork = opts.fork ?? null;
-  const key = instanceKey(envName, fork);
   const isolateSet = parseIsolateSet(env, opts.isolate);
 
-  if (state.instances[key]) {
-    console.log(`Instance ${key} already exists (project ${state.instances[key].project}).`);
-    console.log(`Run \`forkspace down ${envName}${fork ? ` --fork ${fork}` : ""}\` first, or use it as-is.`);
+  type UpReservation =
+    | { kind: "exists"; key: string; project: string; fork: string | null }
+    | {
+        kind: "created";
+        plan: InstancePlan;
+        content: string;
+        envFile: string;
+      };
+
+  const reservation = await withStateLock(root, async (): Promise<UpReservation> => {
+    const state = loadState(root);
+    const key = instanceKey(envName, fork);
+
+    if (state.instances[key]) {
+      return {
+        kind: "exists",
+        key,
+        project: state.instances[key].project,
+        fork,
+      };
+    }
+
+    const slot = fork
+      ? await allocateSlot({
+          basePorts: planSlotProbe({ env, fork, isolateSet }),
+          slotSize: config.slotSize,
+          takenSlots: takenSlots(state, envName),
+          minSlot: 1,
+        })
+      : 0;
+
+    const plan = planInstance({
+      config,
+      env,
+      envName,
+      fork,
+      state,
+      isolateSet,
+      slot,
+    });
+
+    if (plan.requiresBaseline && !state.instances[envName]) {
+      throw new Error(
+        `Fork "${fork}" depends on baseline services (${plan.baselineDependentServices.join(", ")}) ` +
+          `from "${envName}", which isn't up. Run \`forkspace up ${envName}\` first.`
+      );
+    }
+
+    const content = renderEnvFile({
+      env: envName,
+      fork,
+      project: plan.project,
+      ns: plan.ns,
+      entries: plan.envEntries,
+      allocations: plan.allocationEntries,
+    });
+    const envFile = envFileName(envName, fork);
+
+    const record: InstanceRecord = {
+      key: plan.key,
+      env: envName,
+      fork,
+      slot: plan.slot,
+      project: plan.project,
+      ns: plan.ns,
+      backing: plan.backing,
+      ports: plan.ports,
+      services: plan.containerServiceNames,
+      envFile,
+      createdAt: new Date().toISOString(),
+    };
+
+    state.instances[key] = record;
+    saveState(root, state);
+
+    return { kind: "created", plan, content, envFile };
+  });
+
+  if (reservation.kind === "exists") {
+    const { key, project, fork: existingFork } = reservation;
+    console.log(`Instance ${key} already exists (project ${project}).`);
+    console.log(
+      `Run \`forkspace down ${envName}${existingFork ? ` --fork ${existingFork}` : ""}\` first, or use it as-is.`
+    );
     return;
   }
 
-  const slot = fork
-    ? await allocateSlot({
-        basePorts: planSlotProbe({ env, fork, isolateSet }),
-        slotSize: config.slotSize,
-        takenSlots: takenSlots(state, envName),
-        minSlot: 1,
-      })
-    : 0;
-
-  const plan = planInstance({
-    config,
-    env,
-    envName,
-    fork,
-    state,
-    isolateSet,
-    slot,
-  });
-
-  if (plan.requiresBaseline && !state.instances[envName]) {
-    throw new Error(
-      `Fork "${fork}" depends on baseline services (${plan.baselineDependentServices.join(", ")}) ` +
-        `from "${envName}", which isn't up. Run \`forkspace up ${envName}\` first.`
-    );
-  }
+  const { plan, content, envFile } = reservation;
 
   console.log(
     `▲ ${plan.key} → project ${plan.project} (slot ${plan.slot}, ${plan.backing})`
@@ -130,32 +186,8 @@ export async function doUp(
     for (const run of runs) composeUp(root, run);
   }
 
-  const content = renderEnvFile({
-    env: envName,
-    fork,
-    project: plan.project,
-    ns: plan.ns,
-    entries: plan.envEntries,
-    allocations: plan.allocationEntries,
-  });
-  const envFile = writeEnvFile(root, envName, fork, content);
+  writeEnvFile(root, envName, fork, content);
   console.log(`  env file → ${envFile}`);
-
-  const record: InstanceRecord = {
-    key: plan.key,
-    env: envName,
-    fork,
-    slot: plan.slot,
-    project: plan.project,
-    ns: plan.ns,
-    backing: plan.backing,
-    ports: plan.ports,
-    services: plan.containerServiceNames,
-    envFile,
-    createdAt: new Date().toISOString(),
-  };
-  state.instances[key] = record;
-  saveState(root, state);
 
   if (opts.hooks && plan.hooks.up.length > 0) {
     const hookEnv = envToRecord(content);
@@ -167,69 +199,73 @@ export async function doUp(
   console.log(`✓ ${plan.key} is up`);
 }
 
-export function doDown(
+export async function doDown(
   root: string,
   config: Config,
-  state: State,
   envName: string,
   opts: { fork?: string; keepVolumes?: boolean; force?: boolean }
-): void {
-  const env = resolveEnv(config, envName);
-  const fork = opts.fork ?? null;
-  const key = instanceKey(envName, fork);
-  const inst = state.instances[key];
-  if (!inst) {
-    console.log(`No instance ${key} in state. Nothing to do.`);
-    return;
-  }
+): Promise<void> {
+  await withStateLock(root, () => {
+    const state = loadState(root);
+    const env = resolveEnv(config, envName);
+    const fork = opts.fork ?? null;
+    const key = instanceKey(envName, fork);
+    const inst = state.instances[key];
+    if (!inst) {
+      console.log(`No instance ${key} in state. Nothing to do.`);
+      return;
+    }
 
-  if (!fork) {
-    const dependents = Object.values(state.instances).filter(
-      (i) => i.env === envName && i.fork
-    );
-    if (dependents.length > 0) {
-      throw new Error(
-        `Baseline "${envName}" has live forks (${dependents
-          .map((d) => d.fork)
-          .join(", ")}). Take them down first.`
+    if (!fork) {
+      const dependents = Object.values(state.instances).filter(
+        (i) => i.env === envName && i.fork
       );
+      if (dependents.length > 0) {
+        throw new Error(
+          `Baseline "${envName}" has live forks (${dependents
+            .map((d) => d.fork)
+            .join(", ")}). Take them down first.`
+        );
+      }
     }
-  }
 
-  const removeVolumes = !env.persistent && !opts.keepVolumes;
-  console.log(`▼ ${key} → project ${inst.project}${removeVolumes ? " (dropping volumes)" : ""}`);
+    const removeVolumes = !env.persistent && !opts.keepVolumes;
+    console.log(`▼ ${key} → project ${inst.project}${removeVolumes ? " (dropping volumes)" : ""}`);
 
-  if (fork && env.hooks.forkDestroy && !opts.force) {
+    if (fork && env.hooks.forkDestroy && !opts.force) {
+      const envFilePath = path.join(root, inst.envFile);
+      if (!existsSync(envFilePath)) {
+        throw new Error(`Env file missing: ${inst.envFile}. Use --force to clean up state anyway.`);
+      }
+      const hookEnv = envToRecord(readFileSync(envFilePath, "utf8"));
+      console.log(`  forkDestroy: ${env.hooks.forkDestroy}`);
+      try {
+        runHook(root, env.hooks.forkDestroy, hookEnv);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new Error(
+          `${msg} Use \`forkspace down ${envName} --fork ${fork} --force\` to skip forkDestroy.`
+        );
+      }
+    } else if (fork && env.hooks.forkDestroy && opts.force) {
+      console.log(`  forkDestroy: skipped (--force)`);
+    }
+
+    if (inst.services.length > 0) {
+      composeDown(root, inst.project, removeVolumes);
+    } else {
+      console.log(`  (no container services to stop)`);
+    }
+
+    const overrideDir = path.join(root, ".forkspace", inst.project);
+    if (existsSync(overrideDir)) rmSync(overrideDir, { recursive: true });
     const envFilePath = path.join(root, inst.envFile);
-    if (!existsSync(envFilePath)) {
-      throw new Error(`Env file missing: ${inst.envFile}. Use --force to clean up state anyway.`);
-    }
-    const hookEnv = envToRecord(readFileSync(envFilePath, "utf8"));
-    console.log(`  forkDestroy: ${env.hooks.forkDestroy}`);
-    try {
-      runHook(root, env.hooks.forkDestroy, hookEnv);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      throw new Error(`${msg} Use \`forkspace down ${envName} --fork ${fork} --force\` to skip forkDestroy.`);
-    }
-  } else if (fork && env.hooks.forkDestroy && opts.force) {
-    console.log(`  forkDestroy: skipped (--force)`);
-  }
+    if (existsSync(envFilePath)) rmSync(envFilePath);
 
-  if (inst.services.length > 0) {
-    composeDown(root, inst.project, removeVolumes);
-  } else {
-    console.log(`  (no container services to stop)`);
-  }
-
-  const overrideDir = path.join(root, ".forkspace", inst.project);
-  if (existsSync(overrideDir)) rmSync(overrideDir, { recursive: true });
-  const envFilePath = path.join(root, inst.envFile);
-  if (existsSync(envFilePath)) rmSync(envFilePath);
-
-  delete state.instances[key];
-  saveState(root, state);
-  console.log(`✓ ${key} is down`);
+    delete state.instances[key];
+    saveState(root, state);
+    console.log(`✓ ${key} is down`);
+  });
 }
 
 function loadInstanceEnv(root: string, envFileRel: string): Record<string, string> {
@@ -298,8 +334,8 @@ program
   )
   .option("--no-hooks", "skip lifecycle hooks")
   .action(async (envName: string, opts: { fork?: string; isolate?: string; hooks: boolean }) => {
-    const { root, config, state } = ctx();
-    await doUp(root, config, state, envName, opts);
+    const { root, config } = ctx();
+    await doUp(root, config, envName, opts);
   });
 
 program
@@ -309,9 +345,9 @@ program
   .option("--fork <name>")
   .option("--keep-volumes", "keep volumes even for non-persistent environments")
   .option("--force", "skip forkDestroy and clean up state anyway")
-  .action((envName: string, opts: { fork?: string; keepVolumes?: boolean; force?: boolean }) => {
-    const { root, config, state } = ctx();
-    doDown(root, config, state, envName, opts);
+  .action(async (envName: string, opts: { fork?: string; keepVolumes?: boolean; force?: boolean }) => {
+    const { root, config } = ctx();
+    await doDown(root, config, envName, opts);
   });
 
 program
@@ -430,7 +466,13 @@ environments:
       listNamespaces: ./scripts/list-namespaces.sh
 `;
 
-program.parseAsync().catch((err: unknown) => {
-  console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
-  process.exit(1);
-});
+function isMainModule(): boolean {
+  return require.main === module;
+}
+
+if (isMainModule()) {
+  program.parseAsync().catch((err: unknown) => {
+    console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  });
+}
