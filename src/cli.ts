@@ -28,6 +28,7 @@ import {
 } from "./compose";
 import { envToRecord, renderEnvFile, writeEnvFile } from "./env";
 import { planInstance, planSlotProbe } from "./plan";
+import { assertNoForkCollisions, validateForkName } from "./fork";
 import {
   hasListNamespacesHook,
   orphanReports,
@@ -79,6 +80,15 @@ export async function doUp(
 ): Promise<void> {
   const env = resolveEnv(config, envName);
   const fork = opts.fork ?? null;
+  if (fork) {
+    validateForkName(fork);
+    assertNoForkCollisions({
+      fork,
+      envName,
+      workspace: config.workspace,
+      state,
+    });
+  }
   const key = instanceKey(envName, fork);
   const isolateSet = parseIsolateSet(env, opts.isolate);
 
@@ -430,7 +440,13 @@ environments:
       listNamespaces: ./scripts/list-namespaces.sh
 `;
 
-program.parseAsync().catch((err: unknown) => {
-  console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
-  process.exit(1);
-});
+function isMainModule(): boolean {
+  return require.main === module;
+}
+
+if (isMainModule()) {
+  program.parseAsync().catch((err: unknown) => {
+    console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  });
+}
