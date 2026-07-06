@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 export interface InstanceRecord {
@@ -40,11 +40,13 @@ export function loadState(root: string): State {
 }
 
 export function saveState(root: string, state: State): void {
-  mkdirSync(stateDir(root), { recursive: true });
-  writeFileSync(
-    path.join(stateDir(root), STATE_FILE),
-    JSON.stringify(state, null, 2) + "\n"
-  );
+  const dir = stateDir(root);
+  mkdirSync(dir, { recursive: true });
+  const target = path.join(dir, STATE_FILE);
+  const tmp = path.join(dir, `${STATE_FILE}.${process.pid}.${Date.now()}.tmp`);
+  const content = JSON.stringify(state, null, 2) + "\n";
+  writeFileSync(tmp, content);
+  renameSync(tmp, target);
 }
 
 export function instanceKey(env: string, fork: string | null): string {

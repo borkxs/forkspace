@@ -11,7 +11,7 @@ import {
   validateForkName,
 } from "../src/fork";
 import { nsFor } from "../src/ns";
-import { instanceKey, projectName, type State } from "../src/state";
+import { instanceKey, loadState, projectName, saveState, type State } from "../src/state";
 import {
   containerIsolated,
   planInstance,
@@ -457,56 +457,61 @@ describe("fork name validation", () => {
   it("doUp rejects bad fork names before side effects", async () => {
     const root = path.join(__dirname, "fixtures", "workspace");
     const config = loadConfig(root);
-    const state = emptyState();
-    const baselineState: State = {
-      instances: {
-        test: {
-          key: "test",
-          env: "test",
-          fork: null,
-          slot: 0,
-          project: "fs-acme-test",
-          ns: "",
-          backing: "container",
-          ports: { mysql: 3406, dynamodb: 8100 },
-          services: ["mysql", "dynamodb"],
-          envFile: ".env.forkspace.test",
-          createdAt: "",
+    const previous = loadState(root);
+
+    try {
+      await expect(
+        doUp(root, config, "test", { fork: "...", hooks: false })
+      ).rejects.toThrow(/empty namespace token/);
+
+      await expect(
+        doUp(root, config, "test", { fork: "feature/x", hooks: false })
+      ).rejects.toThrow(/invalid characters/);
+
+      await expect(
+        doUp(root, config, "test", {
+          fork: "a".repeat(FORK_NAME_MAX_LENGTH + 1),
+          hooks: false,
+        })
+      ).rejects.toThrow(/too long/);
+
+      saveState(root, {
+        instances: {
+          test: {
+            key: "test",
+            env: "test",
+            fork: null,
+            slot: 0,
+            project: "fs-acme-test",
+            ns: "",
+            backing: "container",
+            ports: { mysql: 3406, dynamodb: 8100 },
+            services: ["mysql", "dynamodb"],
+            envFile: ".env.forkspace.test",
+            createdAt: "",
+          },
+          "test@agent-a": {
+            key: "test@agent-a",
+            env: "test",
+            fork: "agent-a",
+            slot: 1,
+            project: "fs-acme-test-agent-a",
+            ns: "agent_a",
+            backing: "namespace-only",
+            ports: { mysql: 3406, dynamodb: 8100 },
+            services: [],
+            envFile: ".env.forkspace.test.agent-a",
+            createdAt: "",
+          },
         },
-        "test@agent-a": {
-          key: "test@agent-a",
-          env: "test",
-          fork: "agent-a",
-          slot: 1,
-          project: "fs-acme-test-agent-a",
-          ns: "agent_a",
-          backing: "namespace-only",
-          ports: { mysql: 3406, dynamodb: 8100 },
-          services: [],
-          envFile: ".env.forkspace.test.agent-a",
-          createdAt: "",
-        },
-      },
-    };
+      });
 
-    await expect(
-      doUp(root, config, state, "test", { fork: "...", hooks: false })
-    ).rejects.toThrow(/empty namespace token/);
-
-    await expect(
-      doUp(root, config, state, "test", { fork: "feature/x", hooks: false })
-    ).rejects.toThrow(/invalid characters/);
-
-    await expect(
-      doUp(root, config, state, "test", {
-        fork: "a".repeat(FORK_NAME_MAX_LENGTH + 1),
-        hooks: false,
-      })
-    ).rejects.toThrow(/too long/);
-
-    await expect(
-      doUp(root, config, baselineState, "test", { fork: "agent.a", hooks: false })
-    ).rejects.toThrow(/compose project/);
+      await expect(
+        doUp(root, config, "test", { fork: "agent.a", hooks: false })
+      ).rejects.toThrow(/compose project/);
+    } finally {
+      saveState(root, previous);
+    }
   });
 });
 
