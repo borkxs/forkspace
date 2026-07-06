@@ -102,6 +102,38 @@ export function composePs(root: string, project: string): string {
   return res.status === 0 ? res.stdout.trim() : "";
 }
 
+/** Parse `docker compose ls --format json` output (one JSON object per line). */
+export function parseComposeLsOutput(stdout: string): string[] {
+  const trimmed = stdout.trim();
+  if (!trimmed) return [];
+
+  if (trimmed.startsWith("[")) {
+    const arr = JSON.parse(trimmed) as Array<{ Name?: string }>;
+    return arr.map((row) => row.Name).filter((name): name is string => !!name);
+  }
+
+  const names: string[] = [];
+  for (const line of trimmed.split("\n")) {
+    const row = JSON.parse(line) as { Name?: string };
+    if (row.Name) names.push(row.Name);
+  }
+  return names;
+}
+
+export function listComposeProjects(root: string): string[] {
+  const res = spawnSync("docker", ["compose", "ls", "--format", "json"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  if (res.error) {
+    throw new Error(`Failed to run docker: ${res.error.message}. Is Docker running?`);
+  }
+  if (res.status !== 0) {
+    throw new Error(`docker compose ls exited with ${res.status}`);
+  }
+  return parseComposeLsOutput(res.stdout);
+}
+
 function exec(cwd: string, args: string[]): void {
   const res = spawnSync("docker", args, { cwd, stdio: "inherit" });
   if (res.error) {

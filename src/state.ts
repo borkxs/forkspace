@@ -69,3 +69,7 @@ export function takenSlots(state: State, env: string): Set<number> {
   }
   return s;
 }
+
+export function recordedProjects(state: State): Set<string> {
+  return new Set(Object.values(state.instances).map((inst) => inst.project));
+}
