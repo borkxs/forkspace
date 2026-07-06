@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
 import path from "node:path";
 import { parseConfig, checkConfig, loadConfig } from "../src/config";
+import { doUp } from "../src/cli";
 import { portFor, allocateSlot } from "../src/ports";
 import { buildOverrideYaml, groupByComposeFile } from "../src/compose";
 import { renderEnvFile, envToRecord, envFileName } from "../src/env";
+import {
+  assertNoForkCollisions,
+  FORK_NAME_MAX_LENGTH,
+  validateForkName,
+} from "../src/fork";
 import { nsFor } from "../src/ns";
-import { instanceKey, projectName, type State } from "../src/state";
+import { instanceKey, loadState, projectName, saveState, type State } from "../src/state";
 import {
   containerIsolated,
   planInstance,
@@ -359,6 +365,153 @@ describe("naming", () => {
     expect(instanceKey("test", "agent-a")).toBe("test@agent-a");
     expect(projectName("acme", "test", "agent-a")).toBe("fs-acme-test-agent-a");
     expect(projectName("acme", "dev", null)).toBe("fs-acme-dev");
+  });
+});
+
+describe("fork name validation", () => {
+  it("accepts agent-a", () => {
+    expect(() => validateForkName("agent-a")).not.toThrow();
+  });
+
+  it("rejects empty names", () => {
+    expect(() => validateForkName("")).toThrow(/must not be empty/);
+  });
+
+  it("rejects names with no alphanumeric content", () => {
+    expect(() => validateForkName("...")).toThrow(/empty namespace token/);
+  });
+
+  it("rejects path separators", () => {
+    expect(() => validateForkName("feature/x")).toThrow(/invalid characters/);
+    expect(() => validateForkName("a\\b")).toThrow(/invalid characters/);
+  });
+
+  it("rejects overlong names", () => {
+    const long = "a".repeat(FORK_NAME_MAX_LENGTH + 1);
+    expect(() => validateForkName(long)).toThrow(/too long/);
+  });
+
+  it("rejects project-name collision with a live instance", () => {
+    const state: State = {
+      instances: {
+        "test@agent-a": {
+          key: "test@agent-a",
+          env: "test",
+          fork: "agent-a",
+          slot: 1,
+          project: "fs-acme-test-agent-a",
+          ns: "agent_a",
+          backing: "namespace-only",
+          ports: {},
+          services: [],
+          envFile: ".env.forkspace.test.agent-a",
+          createdAt: "",
+        },
+      },
+    };
+    expect(() =>
+      assertNoForkCollisions({
+        fork: "agent.a",
+        envName: "test",
+        workspace: "acme",
+        state,
+      })
+    ).toThrow(/compose project.*agent-a/);
+  });
+
+  it("rejects ns-token collision from truncated names", () => {
+    const prefix = "agent-xxx-xxxxxxxxxxxxxxxxxxxxxxxxx-";
+    const forkA = `${prefix}1`;
+    const forkB = `${prefix}2`;
+    expect(forkA.length).toBeGreaterThan(FORK_NAME_MAX_LENGTH);
+    expect(forkB.length).toBeGreaterThan(FORK_NAME_MAX_LENGTH);
+    expect(nsFor(forkA)).toBe(nsFor(forkB));
+
+    const state: State = {
+      instances: {
+        [`test@${forkA}`]: {
+          key: `test@${forkA}`,
+          env: "test",
+          fork: forkA,
+          slot: 1,
+          project: projectName("acme", "test", forkA),
+          ns: nsFor(forkA),
+          backing: "namespace-only",
+          ports: {},
+          services: [],
+          envFile: `.env.forkspace.test.${forkA}`,
+          createdAt: "",
+        },
+      },
+    };
+    expect(() =>
+      assertNoForkCollisions({
+        fork: forkB,
+        envName: "test",
+        workspace: "acme",
+        state,
+      })
+    ).toThrow(/namespace token/);
+  });
+
+  it("doUp rejects bad fork names before side effects", async () => {
+    const root = path.join(__dirname, "fixtures", "workspace");
+    const config = loadConfig(root);
+    const previous = loadState(root);
+
+    try {
+      await expect(
+        doUp(root, config, "test", { fork: "...", hooks: false })
+      ).rejects.toThrow(/empty namespace token/);
+
+      await expect(
+        doUp(root, config, "test", { fork: "feature/x", hooks: false })
+      ).rejects.toThrow(/invalid characters/);
+
+      await expect(
+        doUp(root, config, "test", {
+          fork: "a".repeat(FORK_NAME_MAX_LENGTH + 1),
+          hooks: false,
+        })
+      ).rejects.toThrow(/too long/);
+
+      saveState(root, {
+        instances: {
+          test: {
+            key: "test",
+            env: "test",
+            fork: null,
+            slot: 0,
+            project: "fs-acme-test",
+            ns: "",
+            backing: "container",
+            ports: { mysql: 3406, dynamodb: 8100 },
+            services: ["mysql", "dynamodb"],
+            envFile: ".env.forkspace.test",
+            createdAt: "",
+          },
+          "test@agent-a": {
+            key: "test@agent-a",
+            env: "test",
+            fork: "agent-a",
+            slot: 1,
+            project: "fs-acme-test-agent-a",
+            ns: "agent_a",
+            backing: "namespace-only",
+            ports: { mysql: 3406, dynamodb: 8100 },
+            services: [],
+            envFile: ".env.forkspace.test.agent-a",
+            createdAt: "",
+          },
+        },
+      });
+
+      await expect(
+        doUp(root, config, "test", { fork: "agent.a", hooks: false })
+      ).rejects.toThrow(/compose project/);
+    } finally {
+      saveState(root, previous);
+    }
   });
 });
 

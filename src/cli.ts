@@ -27,6 +27,7 @@ import {
   runHook,
 } from "./compose";
 import { envToRecord, envFileName, renderEnvFile, writeEnvFile } from "./env";
+import { assertNoForkCollisions, validateForkName } from "./fork";
 import { withStateLock } from "./lock";
 import { planInstance, planSlotProbe, type InstancePlan } from "./plan";
 import {
@@ -79,6 +80,9 @@ export async function doUp(
 ): Promise<void> {
   const env = resolveEnv(config, envName);
   const fork = opts.fork ?? null;
+  if (fork) {
+    validateForkName(fork);
+  }
   const isolateSet = parseIsolateSet(env, opts.isolate);
 
   type UpReservation =
@@ -93,6 +97,15 @@ export async function doUp(
   const reservation = await withStateLock(root, async (): Promise<UpReservation> => {
     const state = loadState(root);
     const key = instanceKey(envName, fork);
+
+    if (fork) {
+      assertNoForkCollisions({
+        fork,
+        envName,
+        workspace: config.workspace,
+        state,
+      });
+    }
 
     if (state.instances[key]) {
       return {
