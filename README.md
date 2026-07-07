@@ -135,6 +135,19 @@ npm run build
 npm link        # or: node dist/cli.js
 ```
 
+## Playground
+
+An interactive browser playground simulates forkspace without Docker. It includes:
+
+- A **terminal** that accepts real `forkspace` commands with realistic output
+- **Guided scenarios** for every README use case (parallel agents, CI sharding, migrations, etc.)
+- A **command panel** that maps every CLI flag to a form control
+
+```bash
+npm run playground          # dev server at http://localhost:5173
+npm run playground:build    # static build → playground/dist/
+```
+
 ## Setup
 
 At your workspace root (the directory containing your repos):
