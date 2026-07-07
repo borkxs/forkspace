@@ -25,6 +25,54 @@ this with a sledgehammer; most stacks just need their compose services forked.
 lets you **choose your isolation level per service** — container, namespace, or
 shared — instead of duplicating everything or sharing everything.
 
+## Scenarios
+
+### Full-stack local dev (QA)
+
+One persistent baseline for day-to-day work. `forkspace up dev` starts the
+services your `forkspace.yml` claims from your repos' compose files, writes
+`.env.forkspace.dev`, and your app and QA sessions run against it. Volumes
+survive `down`.
+
+![Full-stack local dev](docs/diagrams/full-stack-dev.svg)
+
+### Local tests
+
+A clean, seeded, ephemeral stack on its own ports. `up` runs `bootstrap → seed`,
+tests source the env file, and `down` drops the volumes so no state drifts
+between runs. The test baseline coexists with your dev baseline —
+`forkspace check` proves the port math workspace-wide.
+
+![Local tests](docs/diagrams/local-tests.svg)
+
+### Parallel / forking agents
+
+Worktrees isolate agents' *files*; forkspace isolates their *state*. Each agent
+runs `up test --fork <name>` and gets its own slot, env file, and MySQL
+database inside the one baseline container — no per-agent MySQL, no corrupted
+feedback loops. `ls --orphans` audits leftover namespaces.
+
+![Parallel forking agents](docs/diagrams/parallel-agents.svg)
+
+### Puppeteer locally
+
+Browser e2e runs need an app server *and* backing services, all isolated from
+whatever else is running. Declare the app port as an **allocation**: forkspace
+reserves a per-fork port and exports `FORKSPACE_APP_PORT`; you start the app
+on it and point Puppeteer at it. CI shards the same way with
+`--fork "$CI_NODE_INDEX"`.
+
+![Puppeteer locally](docs/diagrams/puppeteer-local.svg)
+
+### DB migrations in isolation
+
+Migration work is destructive by design — don't run it in a database container
+other agents share. `--isolate mysql` upgrades that one service to `container`
+isolation for that fork only: a fresh MySQL with its own volume to migrate,
+break, and re-fork, while every agent namespace on the baseline keeps working.
+
+![DB migration in isolation](docs/diagrams/db-migration.svg)
+
 ## Choose your isolation level
 
 Each service in an environment declares an `isolation` level:

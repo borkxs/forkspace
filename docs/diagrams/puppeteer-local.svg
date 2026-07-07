@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="484" viewBox="0 0 880 484" role="img" aria-label="Puppeteer locally: headless Chrome drives your app on an allocated port, backed by a forked stack, all wired by one env file">
+  <style>
+    .t  { font-family: -apple-system,'Segoe UI',Helvetica,Arial,sans-serif; fill: #E6EDF7; }
+    .s  { font-family: -apple-system,'Segoe UI',Helvetica,Arial,sans-serif; fill: #93A0BC; }
+    .m  { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #9FB0CE; }
+    .mt { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #2DD4BF; }
+    .mp { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #C4B5FD; }
+  </style>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#93A0BC"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="880" height="484" rx="14" fill="#0B1020"/>
+
+  <text x="32" y="44" class="t" font-size="20" font-weight="600">Puppeteer locally &#8212; a full stack per e2e run</text>
+  <text x="32" y="70" class="mt" font-size="13">$ forkspace up test --fork e2e &amp;&amp; source .env.forkspace.test.e2e</text>
+
+  <!-- puppeteer -->
+  <rect x="32" y="140" width="232" height="110" rx="10" fill="#111831" stroke="#263050"/>
+  <text x="48" y="168" class="t" font-size="14" font-weight="600">puppeteer</text>
+  <text x="48" y="188" class="s" font-size="11">headless Chrome test runner</text>
+  <text x="48" y="212" class="m" font-size="10">page.goto(`http://127.0.0.1:</text>
+  <text x="48" y="228" class="m" font-size="10">  ${env.FORKSPACE_APP_PORT}`)</text>
+
+  <line x1="264" y1="195" x2="312" y2="195" stroke="#93A0BC" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="288" y="184" class="s" font-size="10" text-anchor="middle">HTTP</text>
+
+  <!-- app -->
+  <rect x="316" y="140" width="232" height="110" rx="10" fill="#111831" stroke="#263050"/>
+  <text x="332" y="168" class="t" font-size="14" font-weight="600">your app</text>
+  <text x="332" y="190" class="mt" font-size="11">listening on :4110</text>
+  <text x="332" y="212" class="s" font-size="11">an allocation: forkspace reserves</text>
+  <text x="332" y="228" class="s" font-size="11">the port &#8212; you start the process</text>
+
+  <line x1="548" y1="195" x2="596" y2="195" stroke="#93A0BC" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="572" y="184" class="s" font-size="10" text-anchor="middle">SQL/SDK</text>
+
+  <!-- backing stack -->
+  <rect x="600" y="96" width="248" height="280" rx="10" fill="#111831" stroke="#263050"/>
+  <text x="616" y="120" class="s" font-size="12">backing services &#8212; fork e2e &#183; slot 1</text>
+
+  <rect x="616" y="134" width="216" height="56" rx="6" fill="#14203E" stroke="#35548F"/>
+  <text x="628" y="156" class="t" font-size="13">mysql <tspan class="mp" font-size="11">db: e2e</tspan></text>
+  <text x="628" y="175" class="m" font-size="11">127.0.0.1:3406 &#183; namespace</text>
+
+  <rect x="616" y="200" width="216" height="48" rx="6" fill="#151C30" stroke="#3D4A6E"/>
+  <text x="628" y="220" class="t" font-size="12">dynamodb</text>
+  <text x="628" y="238" class="m" font-size="11">:8100 &#183; shared</text>
+
+  <rect x="616" y="256" width="216" height="48" rx="6" fill="#151C30" stroke="#3D4A6E"/>
+  <text x="628" y="276" class="t" font-size="12">elasticmq</text>
+  <text x="628" y="294" class="m" font-size="11">:9424 &#183; shared</text>
+
+  <rect x="616" y="312" width="216" height="48" rx="6" fill="#151C30" stroke="#3D4A6E"/>
+  <text x="628" y="332" class="t" font-size="12">minio</text>
+  <text x="628" y="350" class="m" font-size="11">:9100 &#183; shared</text>
+
+  <!-- env file -->
+  <rect x="32" y="396" width="516" height="64" rx="8" fill="#10192F" stroke="#2DD4BF" stroke-opacity="0.7"/>
+  <text x="48" y="420" class="mt" font-size="12">.env.forkspace.test.e2e</text>
+  <text x="48" y="442" class="m" font-size="10">FORKSPACE_APP_PORT=4110  DATABASE_URL=mysql://..:3406/e2e</text>
+
+  <line x1="148" y1="392" x2="148" y2="254" stroke="#3D4A6E" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#arr)"/>
+  <line x1="432" y1="392" x2="432" y2="254" stroke="#3D4A6E" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#arr)"/>
+  <text x="160" y="330" class="s" font-size="10">source</text>
+  <text x="444" y="330" class="s" font-size="10">source</text>
+
+  <text x="600" y="424" class="s" font-size="11">CI shards the same way:</text>
+  <text x="600" y="444" class="mt" font-size="11">--fork "$CI_NODE_INDEX" --no-hooks</text>
+</svg>

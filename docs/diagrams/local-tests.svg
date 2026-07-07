@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="416" viewBox="0 0 880 416" role="img" aria-label="Local tests: forkspace up test starts a clean seeded stack, tests source the env file, forkspace down drops the volumes">
+  <style>
+    .t  { font-family: -apple-system,'Segoe UI',Helvetica,Arial,sans-serif; fill: #E6EDF7; }
+    .s  { font-family: -apple-system,'Segoe UI',Helvetica,Arial,sans-serif; fill: #93A0BC; }
+    .m  { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #9FB0CE; }
+    .mt { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #2DD4BF; }
+  </style>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#93A0BC"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="880" height="416" rx="14" fill="#0B1020"/>
+
+  <text x="32" y="44" class="t" font-size="20" font-weight="600">Local tests &#8212; clean, seeded, ephemeral</text>
+  <text x="32" y="70" class="mt" font-size="13">$ forkspace up test &amp;&amp; source .env.forkspace.test &amp;&amp; npm test</text>
+
+  <!-- step 1 -->
+  <rect x="32" y="96" width="186" height="92" rx="10" fill="#111831" stroke="#263050"/>
+  <text x="48" y="122" class="t" font-size="14" font-weight="600">1 &#183; up</text>
+  <text x="48" y="146" class="mt" font-size="11">forkspace up test</text>
+  <text x="48" y="168" class="s" font-size="11">clean baseline, slot 0</text>
+
+  <line x1="218" y1="142" x2="238" y2="142" stroke="#93A0BC" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- step 2 -->
+  <rect x="242" y="96" width="186" height="92" rx="10" fill="#111831" stroke="#263050"/>
+  <text x="258" y="122" class="t" font-size="14" font-weight="600">2 &#183; hooks</text>
+  <text x="258" y="146" class="mt" font-size="11">bootstrap &#8594; seed</text>
+  <text x="258" y="168" class="s" font-size="11">tables, queues, fixtures</text>
+
+  <line x1="428" y1="142" x2="448" y2="142" stroke="#93A0BC" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- step 3 -->
+  <rect x="452" y="96" width="186" height="92" rx="10" fill="#111831" stroke="#263050"/>
+  <text x="468" y="122" class="t" font-size="14" font-weight="600">3 &#183; test</text>
+  <text x="468" y="146" class="mt" font-size="10">source .env.forkspace.test</text>
+  <text x="468" y="168" class="s" font-size="11">npm test hits real services</text>
+
+  <line x1="638" y1="142" x2="658" y2="142" stroke="#93A0BC" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- step 4 -->
+  <rect x="662" y="96" width="186" height="92" rx="10" fill="#111831" stroke="#263050"/>
+  <text x="678" y="122" class="t" font-size="14" font-weight="600">4 &#183; down</text>
+  <text x="678" y="146" class="mt" font-size="11">forkspace down test</text>
+  <text x="678" y="168" class="s" font-size="11">volumes dropped &#8212; no drift</text>
+
+  <!-- connectors to docker panel -->
+  <line x1="125" y1="188" x2="125" y2="228" stroke="#3D4A6E" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#arr)"/>
+  <line x1="335" y1="188" x2="335" y2="228" stroke="#3D4A6E" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#arr)"/>
+  <line x1="545" y1="188" x2="545" y2="228" stroke="#3D4A6E" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#arr)"/>
+  <line x1="755" y1="188" x2="755" y2="228" stroke="#3D4A6E" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#arr)"/>
+
+  <!-- docker panel -->
+  <rect x="32" y="232" width="816" height="152" rx="10" fill="#111831" stroke="#263050"/>
+  <text x="48" y="256" class="s" font-size="12">Docker &#8212; project fs-acme-test &#183; slot 0 &#183; persistent: false</text>
+
+  <rect x="52" y="272" width="176" height="56" rx="6" fill="#14203E" stroke="#35548F"/>
+  <text x="64" y="294" class="t" font-size="13">mysql</text>
+  <text x="64" y="313" class="m" font-size="12">127.0.0.1:3406</text>
+
+  <rect x="252" y="272" width="176" height="56" rx="6" fill="#14203E" stroke="#35548F"/>
+  <text x="264" y="294" class="t" font-size="13">dynamodb</text>
+  <text x="264" y="313" class="m" font-size="12">127.0.0.1:8100</text>
+
+  <rect x="452" y="272" width="176" height="56" rx="6" fill="#14203E" stroke="#35548F"/>
+  <text x="464" y="294" class="t" font-size="13">elasticmq</text>
+  <text x="464" y="313" class="m" font-size="12">127.0.0.1:9424</text>
+
+  <rect x="652" y="272" width="176" height="56" rx="6" fill="#14203E" stroke="#35548F"/>
+  <text x="664" y="294" class="t" font-size="13">minio</text>
+  <text x="664" y="313" class="m" font-size="12">127.0.0.1:9100</text>
+
+  <text x="440" y="360" class="s" font-size="11" text-anchor="middle">coexists with your dev baseline &#8212; different basePorts; `forkspace check` validates the whole workspace for collisions</text>
+</svg>

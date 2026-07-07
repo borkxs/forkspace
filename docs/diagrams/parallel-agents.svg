@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="556" viewBox="0 0 880 556" role="img" aria-label="Parallel coding agents: three agents each fork the test environment; MySQL gives each a namespace database in one container, the other services are shared">
+  <style>
+    .t  { font-family: -apple-system,'Segoe UI',Helvetica,Arial,sans-serif; fill: #E6EDF7; }
+    .s  { font-family: -apple-system,'Segoe UI',Helvetica,Arial,sans-serif; fill: #93A0BC; }
+    .m  { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #9FB0CE; }
+    .mt { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #2DD4BF; }
+    .mo { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #FBA94C; }
+    .mp { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #C4B5FD; }
+  </style>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#93A0BC"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="880" height="556" rx="14" fill="#0B1020"/>
+
+  <text x="32" y="44" class="t" font-size="20" font-weight="600">Parallel / forking agents &#8212; one baseline, isolated forks</text>
+  <text x="32" y="70" class="mt" font-size="13">$ forkspace up test --fork agent-a&#160;&#160;&#160;<tspan class="s">(one per agent or worktree)</tspan></text>
+
+  <!-- agent-a -->
+  <rect x="32" y="110" width="260" height="104" rx="10" fill="#241A10" stroke="#FBA94C" stroke-opacity="0.75"/>
+  <text x="48" y="136" class="t" font-size="14" font-weight="600">agent-a <tspan class="s" font-size="11" font-weight="400">&#183; worktree &#183; slot 1</tspan></text>
+  <text x="48" y="158" class="mo" font-size="10">.env.forkspace.test.agent-a</text>
+  <text x="48" y="176" class="m" font-size="10">DATABASE_URL=mysql://..:3406/agent_a</text>
+  <text x="48" y="196" class="s" font-size="11">tests never see agent-b's writes</text>
+
+  <!-- agent-b -->
+  <rect x="32" y="232" width="260" height="104" rx="10" fill="#241A10" stroke="#FBA94C" stroke-opacity="0.75"/>
+  <text x="48" y="258" class="t" font-size="14" font-weight="600">agent-b <tspan class="s" font-size="11" font-weight="400">&#183; worktree &#183; slot 2</tspan></text>
+  <text x="48" y="280" class="mo" font-size="10">.env.forkspace.test.agent-b</text>
+  <text x="48" y="298" class="m" font-size="10">DATABASE_URL=mysql://..:3406/agent_b</text>
+  <text x="48" y="318" class="s" font-size="11">same port, its own database</text>
+
+  <!-- agent-c -->
+  <rect x="32" y="354" width="260" height="104" rx="10" fill="#241A10" stroke="#FBA94C" stroke-opacity="0.75"/>
+  <text x="48" y="380" class="t" font-size="14" font-weight="600">agent-c <tspan class="s" font-size="11" font-weight="400">&#183; worktree &#183; slot 3</tspan></text>
+  <text x="48" y="402" class="mo" font-size="10">.env.forkspace.test.agent-c</text>
+  <text x="48" y="420" class="m" font-size="10">DATABASE_URL=mysql://..:3406/agent_c</text>
+  <text x="48" y="440" class="s" font-size="11">forked &amp; torn down in seconds</text>
+
+  <text x="162" y="490" class="s" font-size="11" text-anchor="middle">a fork = a slot + a namespace token &#8212;</text>
+  <text x="162" y="506" class="s" font-size="11" text-anchor="middle">no extra MySQL container per agent</text>
+
+  <!-- arrows -->
+  <path d="M292,162 C344,162 344,186 396,189" fill="none" stroke="#93A0BC" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M292,284 C344,284 344,213 396,211" fill="none" stroke="#93A0BC" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M292,406 C344,406 344,238 396,233" fill="none" stroke="#93A0BC" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- baseline panel -->
+  <rect x="380" y="96" width="468" height="392" rx="10" fill="#111831" stroke="#263050"/>
+  <text x="396" y="120" class="s" font-size="12">Docker &#8212; baseline fs-acme-test &#183; slot 0</text>
+
+  <!-- mysql container -->
+  <rect x="400" y="136" width="428" height="150" rx="8" fill="#14203E" stroke="#35548F"/>
+  <text x="416" y="162" class="t" font-size="13">mysql <tspan class="mp" font-size="11">isolation: namespace</tspan></text>
+  <text x="812" y="162" class="m" font-size="12" text-anchor="end">127.0.0.1:3406</text>
+
+  <rect x="420" y="180" width="120" height="40" rx="6" fill="#1B1533" stroke="#A78BFA"/>
+  <text x="480" y="205" class="mp" font-size="12" text-anchor="middle">agent_a</text>
+  <rect x="556" y="180" width="120" height="40" rx="6" fill="#1B1533" stroke="#A78BFA"/>
+  <text x="616" y="205" class="mp" font-size="12" text-anchor="middle">agent_b</text>
+  <rect x="692" y="180" width="120" height="40" rx="6" fill="#1B1533" stroke="#A78BFA"/>
+  <text x="752" y="205" class="mp" font-size="12" text-anchor="middle">agent_c</text>
+
+  <text x="614" y="248" class="s" font-size="11" text-anchor="middle">one container &#8212; one database per fork,</text>
+  <text x="614" y="264" class="s" font-size="11" text-anchor="middle">created by your forkCreate hook, dropped by forkDestroy</text>
+
+  <!-- shared services -->
+  <text x="400" y="322" class="s" font-size="12">isolation: shared &#8212; forks reuse the baseline's copy</text>
+
+  <rect x="400" y="336" width="132" height="52" rx="6" fill="#151C30" stroke="#3D4A6E"/>
+  <text x="412" y="357" class="t" font-size="12">dynamodb</text>
+  <text x="412" y="375" class="m" font-size="11">:8100</text>
+
+  <rect x="548" y="336" width="132" height="52" rx="6" fill="#151C30" stroke="#3D4A6E"/>
+  <text x="560" y="357" class="t" font-size="12">elasticmq</text>
+  <text x="560" y="375" class="m" font-size="11">:9424</text>
+
+  <rect x="696" y="336" width="132" height="52" rx="6" fill="#151C30" stroke="#3D4A6E"/>
+  <text x="708" y="357" class="t" font-size="12">minio</text>
+  <text x="708" y="375" class="m" font-size="11">:9100</text>
+
+  <text x="614" y="424" class="s" font-size="11" text-anchor="middle">need hard isolation for one service? `--isolate mysql` gives that fork</text>
+  <text x="614" y="440" class="s" font-size="11" text-anchor="middle">its own container instead &#8212; per fork, no config change</text>
+
+  <text x="614" y="470" class="mt" font-size="11" text-anchor="middle">$ forkspace ls --orphans&#160;&#160;<tspan class="s">audits leftover namespaces</tspan></text>
+
+  <text x="32" y="536" class="mt" font-size="12">$ forkspace down test --fork agent-a&#160;&#160;&#160;<tspan class="s">drops database agent_a, frees slot 1 &#8212; baseline untouched</tspan></text>
+</svg>
