@@ -143,10 +143,27 @@ An interactive browser playground simulates forkspace without Docker. It include
 - **Guided scenarios** for every README use case (parallel agents, CI sharding, migrations, etc.)
 - A **command panel** that maps every CLI flag to a form control
 
+**Live demo:** https://borkxs.github.io/forkspace/ (deployed from `main` via GitHub Pages)
+
 ```bash
-npm run playground          # dev server at http://localhost:5173
-npm run playground:build    # static build → playground/dist/
+npm run playground              # dev server at http://localhost:5173
+npm run playground:build        # static build → playground/dist/
+npm run playground:build:pages  # build with /forkspace/ base path (same as CI)
 ```
+
+### Simulation vs real CLI
+
+The playground is a **pedagogical simulator**, not a second implementation. Some drift is possible:
+
+| Shared with CLI | Simulated separately |
+|---|---|
+| Namespace token rules (`src/ns.ts`, imported) | Docker compose up/down/ps |
+| Port math (`basePort + slot × slotSize`) | Hook execution |
+| Command structure and flags | Full `check` validation |
+| | Host port probing for slot allocation |
+| | `prune` stranded-project detection |
+
+Output formatting and error messages are hand-matched to the CLI today. If you change command behavior in `src/cli.ts`, update `playground/src/sim/engine.ts` too — or add snapshot tests over the simulator when the surface stabilizes.
 
 ## Setup
 

@@ -8,7 +8,10 @@
     "skipLibCheck": true,
     "noEmit": true,
     "isolatedModules": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "paths": {
+      "@forkspace/*": ["../src/*"]
+    }
   },
   "include": ["src/**/*.ts"]
 }

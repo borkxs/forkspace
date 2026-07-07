@@ -1,4 +1,5 @@
 export function portFor(basePort: number, slot: number, slotSize: number): number {
+  // Keep in sync with src/ports.ts (can't import — that module pulls node:net).
   return basePort + slot * slotSize;
 }
 

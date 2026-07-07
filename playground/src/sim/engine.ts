@@ -7,7 +7,7 @@ import type {
   State,
 } from "./types";
 import { DEMO_CONFIG } from "./config";
-import { effectiveNs, nsDashFor } from "./ns";
+import { effectiveNs, nsDashFor } from "@forkspace/ns";
 import { allocateSlot, portFor } from "./ports";
 
 export function instanceKey(env: string, fork: string | null): string {
