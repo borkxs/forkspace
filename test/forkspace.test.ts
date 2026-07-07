@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import path from "node:path";
+import { existsSync, rmSync } from "node:fs";
 import { parseConfig, checkConfig, loadConfig } from "../src/config";
 import { doUp } from "../src/cli";
 import { portFor, allocateSlot } from "../src/ports";
@@ -10,7 +11,7 @@ import {
   FORK_NAME_MAX_LENGTH,
   validateForkName,
 } from "../src/fork";
-import { nsFor } from "../src/ns";
+import { nsFor, nsDashFor, effectiveNs } from "../src/ns";
 import { instanceKey, loadState, projectName, saveState, type State } from "../src/state";
 import {
   containerIsolated,
@@ -50,6 +51,39 @@ describe("config", () => {
     expect(cfg.environments.test.allocations).toEqual({});
     expect(cfg.environments.test.services.mysql.isolation).toBe("container");
     expect(cfg.environments.test.services.dynamodb.isolation).toBe("shared");
+  });
+
+  it("parses baselineNs", () => {
+    const yml = `
+workspace: app
+environments:
+  test:
+    baselineNs: main
+    services:
+      mysql:
+        compose: api/docker-compose.yml
+        service: db
+        basePort: 3406
+        containerPort: 3306
+`;
+    const cfg = parseConfig(yml);
+    expect(cfg.environments.test.baselineNs).toBe("main");
+  });
+
+  it("rejects invalid baselineNs", () => {
+    const yml = `
+workspace: app
+environments:
+  test:
+    baselineNs: Main-DB
+    services:
+      mysql:
+        compose: api/docker-compose.yml
+        service: db
+        basePort: 3406
+        containerPort: 3306
+`;
+    expect(() => parseConfig(yml)).toThrow(/baselineNs/);
   });
 
   it("parses allocations and fork hooks", () => {
@@ -135,7 +169,7 @@ environments:
     expect(warnings.some((w) => w.includes("FORKSPACE_CUSTOM"))).toBe(true);
   });
 
-  it("warns when namespace exports omit {ns}/{_ns}", () => {
+  it("warns when namespace exports omit {ns}/{_ns}/{nsdash}", () => {
     const root = path.join(__dirname, "fixtures", "workspace");
     const config = loadConfig(root);
     config.environments.test.services.mysql.exports.DATABASE_URL =
@@ -205,12 +239,16 @@ describe("compose override", () => {
 });
 
 describe("env file", () => {
+  const invokeDir = "/workspace/my-app";
+
   it("renders standard vars and export templates", () => {
     const content = renderEnvFile({
       env: "test",
       fork: "agent-a",
       project: "fs-acme-test-agent-a",
       ns: "agent_a",
+      nsDash: "agent-a",
+      invokeDir,
       entries: [
         {
           name: "mysql",
@@ -230,16 +268,53 @@ describe("env file", () => {
     expect(rec.FORKSPACE_ENV).toBe("test");
     expect(rec.FORKSPACE_FORK).toBe("agent-a");
     expect(rec.FORKSPACE_NS).toBe("agent_a");
+    expect(rec.FORKSPACE_NS_DASH).toBe("agent-a");
+    expect(rec.FORKSPACE_INVOKE_DIR).toBe(invokeDir);
     expect(rec.FORKSPACE_MYSQL_PORT).toBe("3416");
     expect(rec.DATABASE_URL).toBe("mysql://root:root@127.0.0.1:3416/app");
   });
 
-  it("renders {ns} and {_ns} in export templates", () => {
+  it("renders {ns}, {_ns}, {nsdash} in export templates", () => {
     const forkContent = renderEnvFile({
+      env: "test",
+      fork: "wip-billing",
+      project: "fs-acme-test-wip-billing",
+      ns: "wip_billing",
+      nsDash: "wip-billing",
+      invokeDir,
+      entries: [
+        {
+          name: "mysql",
+          def: {
+            compose: "x.yml",
+            service: "db",
+            basePort: 3406,
+            containerPort: 3306,
+            isolation: "namespace",
+            exports: {
+              DATABASE_URL: "mysql://root:1@{host}:{port}/acme_test{_ns}",
+              TABLE_PREFIX: "{ns_}",
+              S3_BUCKET: "app{_nsdash}",
+            },
+          },
+          hostPort: 3416,
+        },
+      ],
+    });
+    const forkRec = envToRecord(forkContent);
+    expect(forkRec.DATABASE_URL).toBe(
+      "mysql://root:1@127.0.0.1:3416/acme_test_wip_billing"
+    );
+    expect(forkRec.TABLE_PREFIX).toBe("wip_billing_");
+    expect(forkRec.S3_BUCKET).toBe("app-wip-billing");
+
+    const forkContent2 = renderEnvFile({
       env: "test",
       fork: "agent-a",
       project: "fs-acme-test-agent-a",
       ns: "agent_a",
+      nsDash: "agent-a",
+      invokeDir,
       entries: [
         {
           name: "mysql",
@@ -258,16 +333,79 @@ describe("env file", () => {
         },
       ],
     });
-    expect(envToRecord(forkContent).DATABASE_URL).toBe(
+    expect(envToRecord(forkContent2).DATABASE_URL).toBe(
       "mysql://root:1@127.0.0.1:3416/acme_test_agent_a"
     );
-    expect(envToRecord(forkContent).TABLE_PREFIX).toBe("agent_a_");
+    expect(envToRecord(forkContent2).TABLE_PREFIX).toBe("agent_a_");
 
     const baselineContent = renderEnvFile({
       env: "test",
       fork: null,
       project: "fs-acme-test",
+      ns: "main",
+      invokeDir,
+      entries: [
+        {
+          name: "mysql",
+          def: {
+            compose: "x.yml",
+            service: "db",
+            basePort: 3406,
+            containerPort: 3306,
+            isolation: "namespace",
+            exports: {
+              DATABASE_URL: "mysql://root:1@{host}:{port}/acme_test{_ns}",
+              TABLE_PREFIX: "{ns_}",
+            },
+          },
+          hostPort: 3406,
+        },
+      ],
+    });
+    expect(envToRecord(baselineContent).DATABASE_URL).toBe(
+      "mysql://root:1@127.0.0.1:3406/acme_test_main"
+    );
+    expect(envToRecord(baselineContent).TABLE_PREFIX).toBe("main_");
+    expect(envToRecord(baselineContent).FORKSPACE_NS).toBe("main");
+  });
+
+  it("emits baseline address exports for forks", () => {
+    const content = renderEnvFile({
+      env: "test",
+      fork: "agent-a",
+      project: "fs-acme-test-agent-a",
+      ns: "agent_a",
+      nsDash: "agent-a",
+      invokeDir,
+      entries: [
+        {
+          name: "mysql",
+          def: {
+            compose: "x.yml",
+            service: "db",
+            basePort: 3406,
+            containerPort: 3306,
+            isolation: "container",
+            exports: {},
+          },
+          hostPort: 3416,
+        },
+      ],
+      baseline: { ns: "main", ports: { mysql: 3406 } },
+    });
+    const rec = envToRecord(content);
+    expect(rec.FORKSPACE_BASELINE_NS).toBe("main");
+    expect(rec.FORKSPACE_BASELINE_MYSQL_HOST).toBe("127.0.0.1");
+    expect(rec.FORKSPACE_BASELINE_MYSQL_PORT).toBe("3406");
+  });
+
+  it("baseline without baselineNs keeps empty ns templates", () => {
+    const baselineContent = renderEnvFile({
+      env: "test",
+      fork: null,
+      project: "fs-acme-test",
       ns: "",
+      invokeDir,
       entries: [
         {
           name: "mysql",
@@ -302,6 +440,7 @@ describe("env file", () => {
       fork: null,
       project: "fs-acme-test",
       ns: "",
+      invokeDir,
       entries: [],
       allocations: [{ name: "app", hostPort: portFor(appBase, 0, slotSize) }],
     });
@@ -312,6 +451,8 @@ describe("env file", () => {
       fork: "agent-a",
       project: "fs-acme-test-agent-a",
       ns: "agent_a",
+      nsDash: "agent-a",
+      invokeDir,
       entries: [],
       allocations: [{ name: "app", hostPort: portFor(appBase, 1, slotSize) }],
     });
@@ -327,14 +468,27 @@ describe("env file", () => {
 });
 
 describe("namespace tokens", () => {
-  it("returns empty string for baseline", () => {
+  it("returns empty string for baseline without baselineNs", () => {
     expect(nsFor(null)).toBe("");
     expect(nsFor("")).toBe("");
+    expect(effectiveNs(null)).toBe("");
+    expect(effectiveNs(null, "main")).toBe("main");
   });
 
   it("lowercases and converts dashes to underscores", () => {
     expect(nsFor("agent-a")).toBe("agent_a");
     expect(nsFor("E2E-1")).toBe("e2e_1");
+  });
+
+  it("mints dashed variant for bucket-friendly names", () => {
+    expect(nsDashFor("wip-billing")).toBe("wip-billing");
+    expect(nsDashFor("agent-a")).toBe("agent-a");
+    expect(nsDashFor("wip_billing")).toBe("wip-billing");
+    expect(nsDashFor(null)).toBe("");
+  });
+
+  it("prefixes f- when dashed token would start with a digit", () => {
+    expect(nsDashFor("1st")).toBe("f-1st");
   });
 
   it("prefixes f_ when the token would start with a digit", () => {
@@ -417,6 +571,18 @@ describe("fork name validation", () => {
         state,
       })
     ).toThrow(/compose project.*agent-a/);
+  });
+
+  it("rejects ns-token collision with baselineNs", () => {
+    expect(() =>
+      assertNoForkCollisions({
+        fork: "main",
+        envName: "test",
+        workspace: "acme",
+        state: { instances: {} },
+        baselineNs: "main",
+      })
+    ).toThrow(/reserved for the baseline/);
   });
 
   it("rejects ns-token collision from truncated names", () => {
@@ -513,6 +679,68 @@ describe("fork name validation", () => {
       saveState(root, previous);
     }
   });
+
+  it("doUp rolls back on hook failure", async () => {
+    const root = path.join(__dirname, "fixtures", "workspace");
+    const baseConfig = loadConfig(root);
+    const previous = loadState(root);
+    const config = parseConfig(`
+workspace: acme
+environments:
+  test:
+    baselineNs: main
+    services:
+      mysql:
+        compose: my-api/docker-compose.yml
+        service: db
+        basePort: 3406
+        containerPort: 3306
+        isolation: namespace
+      dynamodb:
+        compose: my-api/docker-compose.yml
+        service: dynamodb
+        basePort: 8100
+        containerPort: 8000
+        isolation: shared
+    hooks:
+      forkCreate: "false"
+      forkDestroy: "true"
+`);
+
+    try {
+      saveState(root, {
+        instances: {
+          test: {
+            key: "test",
+            env: "test",
+            fork: null,
+            slot: 0,
+            project: "fs-acme-test",
+            ns: "main",
+            backing: "container",
+            ports: { mysql: 3406, dynamodb: 8100 },
+            services: ["mysql", "dynamodb"],
+            envFile: ".env.forkspace.test",
+            createdAt: "",
+          },
+        },
+      });
+
+      await expect(
+        doUp(root, config, "test", { fork: "agent-a", hooks: true })
+      ).rejects.toThrow(/rolled back test@agent-a/);
+
+      const state = loadState(root);
+      expect(state.instances["test@agent-a"]).toBeUndefined();
+      expect(
+        existsSync(path.join(root, ".env.forkspace.test.agent-a"))
+      ).toBe(false);
+    } finally {
+      saveState(root, previous);
+      const envFile = path.join(root, ".env.forkspace.test.agent-a");
+      if (existsSync(envFile)) rmSync(envFile);
+    }
+  });
 });
 
 const TEST_ENV = parseConfig(MINIMAL_YML).environments.test;
@@ -523,6 +751,61 @@ function emptyState(): State {
 }
 
 describe("planInstance", () => {
+  it("baseline uses baselineNs in plan", () => {
+    const env = {
+      ...TEST_ENV,
+      baselineNs: "main",
+    };
+    const plan = planInstance({
+      config: { workspace: "acme", slotSize: SLOT_SIZE, environments: { test: env } },
+      env,
+      envName: "test",
+      fork: null,
+      state: emptyState(),
+      isolateSet: null,
+      slot: 0,
+    });
+    expect(plan.ns).toBe("main");
+    expect(plan.nsDash).toBe("");
+  });
+
+  it("fork exports nsDash", () => {
+    const env = {
+      ...TEST_ENV,
+      services: {
+        mysql: { ...TEST_ENV.services.mysql, isolation: "namespace" as const },
+        dynamodb: { ...TEST_ENV.services.dynamodb, isolation: "shared" as const },
+      },
+    };
+    const plan = planInstance({
+      config: { workspace: "acme", slotSize: SLOT_SIZE, environments: { test: env } },
+      env,
+      envName: "test",
+      fork: "wip-billing",
+      state: {
+        instances: {
+          test: {
+            key: "test",
+            env: "test",
+            fork: null,
+            slot: 0,
+            project: "fs-acme-test",
+            ns: "main",
+            backing: "container",
+            ports: { mysql: 3406, dynamodb: 8100 },
+            services: ["mysql", "dynamodb"],
+            envFile: ".env.forkspace.test",
+            createdAt: "",
+          },
+        },
+      },
+      isolateSet: null,
+      slot: 1,
+    });
+    expect(plan.ns).toBe("wip_billing");
+    expect(plan.nsDash).toBe("wip-billing");
+  });
+
   it("baseline starts all services and runs bootstrap → seed", () => {
     const env = {
       ...TEST_ENV,

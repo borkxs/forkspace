@@ -1,13 +1,14 @@
 import type { Config, EnvironmentDef } from "./config";
 import type { PlannedService } from "./compose";
 import type { AllocationEntry, EnvEntry } from "./env";
-import { nsFor } from "./ns";
+import { effectiveNs, nsDashFor } from "./ns";
 import { portFor } from "./ports";
 import { instanceKey, projectName, type State } from "./state";
 
 export interface InstancePlan {
   containersToStart: PlannedService[];
   ns: string;
+  nsDash: string;
   ports: Record<string, number>;
   hooks: {
     up: string[];
@@ -63,7 +64,8 @@ export function planInstance(opts: {
 }): InstancePlan {
   const { config, env, envName, fork, state, isolateSet, slot } = opts;
   const allNames = Object.keys(env.services);
-  const ns = nsFor(fork);
+  const ns = effectiveNs(fork, env.baselineNs);
+  const nsDash = fork ? nsDashFor(fork) : "";
   const key = instanceKey(envName, fork);
   const project = projectName(config.workspace, envName, fork);
   const baseline = state.instances[envName];
@@ -116,6 +118,7 @@ export function planInstance(opts: {
   return {
     containersToStart,
     ns,
+    nsDash,
     ports,
     hooks,
     slot,
