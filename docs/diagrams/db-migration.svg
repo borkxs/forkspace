@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="500" viewBox="0 0 880 500" role="img" aria-label="DB migration in isolation: --isolate mysql gives the migration fork its own MySQL container and volume while agents keep working against the baseline">
+  <style>
+    .t  { font-family: -apple-system,'Segoe UI',Helvetica,Arial,sans-serif; fill: #E6EDF7; }
+    .s  { font-family: -apple-system,'Segoe UI',Helvetica,Arial,sans-serif; fill: #93A0BC; }
+    .m  { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #9FB0CE; }
+    .mt { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #2DD4BF; }
+    .mo { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #FBA94C; }
+    .mp { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #C4B5FD; }
+  </style>
+
+  <rect x="0" y="0" width="880" height="500" rx="14" fill="#0B1020"/>
+
+  <text x="32" y="44" class="t" font-size="20" font-weight="600">DB migration in isolation &#8212; without breaking the agents</text>
+  <text x="32" y="70" class="mt" font-size="13">$ forkspace up test --fork mig-042 --isolate mysql</text>
+
+  <!-- baseline panel -->
+  <rect x="32" y="96" width="396" height="300" rx="10" fill="#111831" stroke="#263050"/>
+  <text x="48" y="120" class="s" font-size="12">baseline fs-acme-test &#183; slot 0 &#8212; everyone else's world</text>
+
+  <rect x="52" y="136" width="356" height="124" rx="8" fill="#14203E" stroke="#35548F"/>
+  <text x="68" y="162" class="t" font-size="13">mysql <tspan class="mp" font-size="11">isolation: namespace</tspan></text>
+  <text x="392" y="162" class="m" font-size="12" text-anchor="end">:3406</text>
+
+  <rect x="68" y="180" width="152" height="40" rx="6" fill="#1B1533" stroke="#A78BFA"/>
+  <text x="144" y="205" class="mp" font-size="12" text-anchor="middle">agent_a</text>
+  <rect x="240" y="180" width="152" height="40" rx="6" fill="#1B1533" stroke="#A78BFA"/>
+  <text x="316" y="205" class="mp" font-size="12" text-anchor="middle">agent_b</text>
+
+  <text x="230" y="244" class="s" font-size="11" text-anchor="middle">agents keep running their tests, untouched</text>
+
+  <rect x="52" y="276" width="356" height="48" rx="6" fill="#151C30" stroke="#3D4A6E"/>
+  <text x="68" y="296" class="t" font-size="12">dynamodb &#183; elasticmq &#183; minio</text>
+  <text x="68" y="314" class="m" font-size="11">:8100 &#183; :9424 &#183; :9100 &#8212; shared</text>
+
+  <text x="230" y="360" class="s" font-size="11" text-anchor="middle">old schema stays live here &#8212; nothing the</text>
+  <text x="230" y="376" class="s" font-size="11" text-anchor="middle">migration does can reach this container</text>
+
+  <!-- migration fork panel -->
+  <rect x="452" y="96" width="396" height="300" rx="10" fill="#1A130B" stroke="#FBA94C" stroke-opacity="0.8"/>
+  <text x="468" y="120" class="s" font-size="12"><tspan fill="#FBA94C">fork mig-042</tspan> &#183; slot 1 &#8212; your blast radius</text>
+
+  <rect x="472" y="136" width="356" height="124" rx="8" fill="#241A10" stroke="#FBA94C"/>
+  <text x="488" y="162" class="t" font-size="13">mysql <tspan class="mo" font-size="11">own container, own volume</tspan></text>
+  <text x="812" y="162" class="m" font-size="12" text-anchor="end">:3416</text>
+  <text x="488" y="190" class="m" font-size="11">DATABASE_URL=mysql://..:3416/mig_042</text>
+  <text x="488" y="214" class="s" font-size="11">fresh data dir, seeded by hooks &#8212; migrate up,</text>
+  <text x="488" y="230" class="s" font-size="11">migrate down, wreck it, re-fork, repeat</text>
+
+  <rect x="472" y="276" width="356" height="48" rx="6" fill="#151C30" stroke="#3D4A6E"/>
+  <text x="488" y="296" class="t" font-size="12">dynamodb &#183; elasticmq &#183; minio</text>
+  <text x="488" y="314" class="m" font-size="11">still shared &#8212; only mysql was isolated</text>
+
+  <text x="650" y="360" class="s" font-size="11" text-anchor="middle">--isolate mysql upgrades one service to</text>
+  <text x="650" y="376" class="s" font-size="11" text-anchor="middle">container isolation, for this fork only</text>
+
+  <text x="32" y="440" class="mt" font-size="12">$ forkspace down test --fork mig-042&#160;&#160;&#160;<tspan class="s">container + volume gone; the baseline never noticed</tspan></text>
+  <text x="32" y="470" class="s" font-size="11">forkspace.yml still says isolation: namespace &#8212; the override lives and dies with the fork</text>
+</svg>

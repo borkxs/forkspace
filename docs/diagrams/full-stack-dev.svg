@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="472" viewBox="0 0 880 472" role="img" aria-label="Full-stack local dev: forkspace up dev starts a persistent baseline stack; the env file wires your app and QA browser to it">
+  <style>
+    .t  { font-family: -apple-system,'Segoe UI',Helvetica,Arial,sans-serif; fill: #E6EDF7; }
+    .s  { font-family: -apple-system,'Segoe UI',Helvetica,Arial,sans-serif; fill: #93A0BC; }
+    .m  { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #9FB0CE; }
+    .mt { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #2DD4BF; }
+  </style>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#93A0BC"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="880" height="472" rx="14" fill="#0B1020"/>
+
+  <text x="32" y="44" class="t" font-size="20" font-weight="600">Full-stack local dev (QA)</text>
+  <text x="32" y="70" class="mt" font-size="13">$ forkspace up dev</text>
+  <text x="848" y="44" class="s" font-size="12" text-anchor="end">one persistent baseline &#183; slot 0</text>
+
+  <!-- workspace root panel -->
+  <rect x="32" y="96" width="240" height="250" rx="10" fill="#111831" stroke="#263050"/>
+  <text x="48" y="120" class="s" font-size="12">~/git/acme &#8212; workspace root</text>
+
+  <rect x="48" y="134" width="208" height="32" rx="6" fill="#10192F" stroke="#2DD4BF" stroke-opacity="0.7"/>
+  <text x="60" y="154" class="mt" font-size="12">forkspace.yml</text>
+
+  <rect x="48" y="178" width="208" height="48" rx="6" fill="#182242" stroke="#2E3B63"/>
+  <text x="60" y="197" class="t" font-size="13">my-api/</text>
+  <text x="60" y="215" class="m" font-size="11">docker-compose.yml</text>
+
+  <rect x="48" y="238" width="208" height="32" rx="6" fill="#182242" stroke="#2E3B63"/>
+  <text x="60" y="258" class="t" font-size="13">web/</text>
+
+  <text x="152" y="300" class="s" font-size="11" text-anchor="middle">repos keep their own compose files;</text>
+  <text x="152" y="316" class="s" font-size="11" text-anchor="middle">forkspace.yml says which services run</text>
+
+  <!-- forkspace node -->
+  <rect x="316" y="182" width="132" height="60" rx="10" fill="#0F2B28" stroke="#2DD4BF"/>
+  <text x="382" y="208" class="t" font-size="15" font-weight="600" text-anchor="middle">forkspace</text>
+  <text x="382" y="228" class="mt" font-size="11" text-anchor="middle">up dev</text>
+
+  <line x1="272" y1="212" x2="312" y2="212" stroke="#93A0BC" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="448" y1="212" x2="488" y2="212" stroke="#93A0BC" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="468" y="200" class="s" font-size="10" text-anchor="middle">compose</text>
+
+  <!-- docker panel -->
+  <rect x="492" y="96" width="356" height="250" rx="10" fill="#111831" stroke="#263050"/>
+  <text x="508" y="120" class="s" font-size="12">Docker &#8212; project fs-acme-dev &#183; slot 0</text>
+
+  <rect x="508" y="136" width="156" height="56" rx="6" fill="#14203E" stroke="#35548F"/>
+  <text x="520" y="158" class="t" font-size="13">mysql</text>
+  <text x="520" y="177" class="m" font-size="12">127.0.0.1:3306</text>
+
+  <rect x="676" y="136" width="156" height="56" rx="6" fill="#14203E" stroke="#35548F"/>
+  <text x="688" y="158" class="t" font-size="13">dynamodb</text>
+  <text x="688" y="177" class="m" font-size="12">127.0.0.1:8000</text>
+
+  <rect x="508" y="204" width="156" height="56" rx="6" fill="#14203E" stroke="#35548F"/>
+  <text x="520" y="226" class="t" font-size="13">elasticmq</text>
+  <text x="520" y="245" class="m" font-size="12">127.0.0.1:9324</text>
+
+  <rect x="676" y="204" width="156" height="56" rx="6" fill="#14203E" stroke="#35548F"/>
+  <text x="688" y="226" class="t" font-size="13">minio</text>
+  <text x="688" y="245" class="m" font-size="12">127.0.0.1:9000</text>
+
+  <text x="670" y="296" class="s" font-size="11" text-anchor="middle">persistent: true &#8212; volumes survive `forkspace down`</text>
+  <text x="670" y="314" class="s" font-size="11" text-anchor="middle">networks &amp; volumes auto-prefixed with the project name</text>
+
+  <!-- env file -->
+  <rect x="492" y="376" width="356" height="72" rx="8" fill="#10192F" stroke="#2DD4BF" stroke-opacity="0.7"/>
+  <text x="508" y="398" class="mt" font-size="12">.env.forkspace.dev</text>
+  <text x="508" y="417" class="m" font-size="10">DATABASE_URL=mysql://root:root@127.0.0.1:3306/acmepay</text>
+  <text x="508" y="433" class="m" font-size="10">DYNAMO_ENDPOINT=http://127.0.0.1:8000  + SQS, S3, FORKSPACE_*</text>
+
+  <path d="M382,242 L382,412 L488,412" fill="none" stroke="#93A0BC" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="372" y="330" class="s" font-size="10" text-anchor="end">writes</text>
+
+  <!-- app / QA -->
+  <rect x="32" y="376" width="240" height="72" rx="8" fill="#182242" stroke="#2E3B63"/>
+  <text x="48" y="399" class="t" font-size="13" font-weight="600">your app &#8212; npm run dev</text>
+  <text x="48" y="418" class="s" font-size="11">reads DATABASE_URL &amp; friends,</text>
+  <text x="48" y="434" class="s" font-size="11">QA clicks through in the browser</text>
+
+  <line x1="492" y1="412" x2="276" y2="412" stroke="#93A0BC" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="384" y="402" class="s" font-size="10" text-anchor="middle">source</text>
+</svg>
