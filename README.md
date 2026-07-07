@@ -142,6 +142,7 @@ An interactive browser playground simulates forkspace without Docker. It include
 - A **terminal** that accepts real `forkspace` commands with realistic output
 - **Guided scenarios** for every README use case (parallel agents, CI sharding, migrations, etc.)
 - A **command panel** that maps every CLI flag to a form control
+- A **forkspace.yml editor** — edit config in the browser; `check` and `up` use your changes
 
 **Live demo:** https://borkxs.github.io/forkspace/ (deployed from `main` via GitHub Pages)
 

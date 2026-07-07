@@ -9,11 +9,13 @@ import {
 import type { CommandResult } from "./sim/types";
 import { GuiPanel, type CommandName } from "./ui/gui";
 import { Terminal } from "./ui/terminal";
+import { YamlEditor } from "./ui/yaml-editor";
 
 export class App {
   private sim: Simulator;
   private terminal!: Terminal;
   private gui!: GuiPanel;
+  private yamlEditor!: YamlEditor;
   private activeScenario: Scenario | null = null;
   private stepIdx = 0;
   private scenarioEl!: HTMLElement;
@@ -54,6 +56,7 @@ export class App {
           <div id="terminal-mount"></div>
         </main>
         <aside class="right-panel">
+          <div id="yaml-mount"></div>
           <div id="gui-mount"></div>
         </aside>
       </div>
@@ -61,6 +64,7 @@ export class App {
 
     const termMount = this.root.querySelector("#terminal-mount")!;
     const guiMount = this.root.querySelector("#gui-mount")!;
+    const yamlMount = this.root.querySelector("#yaml-mount")!;
     this.scenarioEl = this.root.querySelector("#scenario-list")!;
     this.stepEl = this.root.querySelector("#step-content")!;
     const guideSection = this.root.querySelector("#scenario-guide")!;
@@ -68,6 +72,9 @@ export class App {
     this.terminal = new Terminal(termMount, (cmd) => this.handleCommand(cmd));
     this.gui = new GuiPanel(guiMount, this.sim, (cmd) => {
       this.terminal.runCommand(cmd);
+    });
+    this.yamlEditor = new YamlEditor(yamlMount, this.sim, () => {
+      this.gui.refresh();
     });
 
     this.renderScenarios();
@@ -80,6 +87,7 @@ export class App {
       this.terminal.clear();
       this.terminal.writeBanner();
       this.gui.refresh();
+      this.yamlEditor.refresh();
       this.renderScenarios();
     });
   }
@@ -111,6 +119,7 @@ export class App {
     this.terminal.clear();
     this.terminal.writeBanner();
     this.gui.refresh();
+    this.yamlEditor.refresh();
     this.renderScenarios();
     this.renderStep();
     this.terminal.write([
@@ -139,22 +148,38 @@ export class App {
       <h3 class="step-title">${step.title}</h3>
       <p class="step-desc">${step.description}</p>
       ${step.hint ? `<p class="step-hint">${step.hint}</p>` : ""}
-      <code class="step-cmd">${step.command}</code>
+      ${step.command ? `<code class="step-cmd">${step.command}</code>` : ""}
       <div class="step-actions">
-        <button type="button" class="btn btn-primary" id="run-step">Run this step</button>
-        ${this.stepIdx < total - 1 ? `<button type="button" class="btn btn-ghost" id="next-step">Skip →</button>` : ""}
+        ${
+          step.action === "edit-yaml"
+            ? `<button type="button" class="btn btn-primary" id="focus-editor">Open editor</button>
+               <button type="button" class="btn btn-ghost" id="continue-step">Continue →</button>`
+            : `<button type="button" class="btn btn-primary" id="run-step">Run this step</button>`
+        }
+        ${this.stepIdx < total - 1 && step.action !== "edit-yaml" ? `<button type="button" class="btn btn-ghost" id="next-step">Skip →</button>` : ""}
         ${this.stepIdx > 0 ? `<button type="button" class="btn btn-ghost" id="prev-step">← Back</button>` : ""}
       </div>
     `;
 
-    this.stepEl.querySelector("#run-step")!.addEventListener("click", () => {
-      const result = this.executeCommand(step.command);
-      this.terminal.echoInput(step.command);
-      this.writeResult(result);
-      if (result.exitCode === 0) {
+    if (step.action === "edit-yaml") {
+      this.yamlEditor.refresh();
+      this.stepEl.querySelector("#focus-editor")!.addEventListener("click", () => {
+        this.yamlEditor.focus();
+      });
+      this.stepEl.querySelector("#continue-step")!.addEventListener("click", () => {
         this.advanceStep();
-      }
-    });
+      });
+    } else {
+      this.stepEl.querySelector("#run-step")!.addEventListener("click", () => {
+        const result = this.executeCommand(step.command!);
+        this.terminal.echoInput(step.command!);
+        this.writeResult(result);
+        this.yamlEditor.refresh();
+        if (result.exitCode === 0) {
+          this.advanceStep();
+        }
+      });
+    }
     this.stepEl.querySelector("#next-step")?.addEventListener("click", () => {
       this.advanceStep();
     });
@@ -215,6 +240,7 @@ export class App {
 
     const result = runCommand(this.sim, parsed);
     this.gui.refresh();
+    this.yamlEditor.refresh();
     this.syncGuiFromCommand(parsed.command as CommandName, parsed.args, parsed.options);
     return result;
   }

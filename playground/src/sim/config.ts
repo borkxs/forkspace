@@ -1,4 +1,5 @@
 import type { Config } from "./types";
+import { stringify } from "yaml";
 
 /** Demo workspace config — mirrors forkspace.example.yml */
 export const DEMO_CONFIG: Config = {
@@ -104,6 +105,8 @@ export const DEMO_CONFIG: Config = {
     },
   },
 };
+
+export const DEMO_CONFIG_YAML = stringify(DEMO_CONFIG);
 
 export const STARTER_CONFIG_YAML = `# forkspace.yml — workspace-level environment definitions
 workspace: myapp

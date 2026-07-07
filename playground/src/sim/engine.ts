@@ -6,9 +6,10 @@ import type {
   OutputLine,
   State,
 } from "./types";
-import { DEMO_CONFIG } from "./config";
+import { DEMO_CONFIG, DEMO_CONFIG_YAML, STARTER_CONFIG_YAML } from "./config";
 import { effectiveNs, nsDashFor } from "@forkspace/ns";
 import { allocateSlot, portFor } from "./ports";
+import { checkConfig, parseConfigYaml } from "./parse-config";
 
 export function instanceKey(env: string, fork: string | null): string {
   return fork ? `${env}.${fork}` : env;
@@ -156,6 +157,7 @@ function renderEnvFile(opts: {
 
 export interface Simulator {
   config: Config;
+  configYaml: string | null;
   state: State;
   hasConfigFile: boolean;
   engineNamespaces: Record<string, string[]>;
@@ -164,6 +166,7 @@ export interface Simulator {
 export function createSimulator(): Simulator {
   return {
     config: structuredClone(DEMO_CONFIG),
+    configYaml: DEMO_CONFIG_YAML,
     state: { instances: {} },
     hasConfigFile: true,
     engineNamespaces: { test: ["main", "agent_a", "agent_b"] },
@@ -172,9 +175,25 @@ export function createSimulator(): Simulator {
 
 export function resetSimulator(sim: Simulator, opts?: { freshWorkspace?: boolean }): void {
   sim.state = { instances: {} };
-  sim.config = structuredClone(DEMO_CONFIG);
   sim.engineNamespaces = { test: ["main", "agent_a", "agent_b"] };
-  sim.hasConfigFile = !opts?.freshWorkspace;
+  if (opts?.freshWorkspace) {
+    sim.hasConfigFile = false;
+    sim.configYaml = null;
+    sim.config = structuredClone(DEMO_CONFIG);
+  } else {
+    sim.hasConfigFile = true;
+    sim.configYaml = DEMO_CONFIG_YAML;
+    sim.config = structuredClone(DEMO_CONFIG);
+  }
+}
+
+export function setConfigYaml(sim: Simulator, yaml: string): { ok: true } | { ok: false; message: string } {
+  const parsed = parseConfigYaml(yaml);
+  if (!parsed.ok) return parsed;
+  sim.configYaml = yaml;
+  sim.config = parsed.config;
+  sim.hasConfigFile = true;
+  return { ok: true };
 }
 
 export interface ParsedCommand {
@@ -564,23 +583,24 @@ function cmdEnv(
 }
 
 function cmdCheck(sim: Simulator): CommandResult {
-  if (!sim.hasConfigFile) {
+  if (!sim.hasConfigFile || sim.configYaml == null) {
     return fail([err("✗ forkspace.yml not found in workspace root")]);
   }
-  const lines: OutputLine[] = [];
-  const warnings: string[] = [];
 
-  const testEnv = sim.config.environments.test;
-  if (testEnv?.services.mysql?.isolation === "namespace") {
-    const tpl = testEnv.services.mysql.exports.DATABASE_URL ?? "";
-    if (!tpl.includes("{ns}")) {
-      warnings.push(
-        'test.mysql: namespace isolation but DATABASE_URL export lacks {ns} template'
-      );
-    }
+  const parsed = parseConfigYaml(sim.configYaml);
+  if (!parsed.ok) {
+    return fail([err(`✗ ${parsed.message}`)]);
   }
 
+  sim.config = parsed.config;
+  const { errors, warnings } = checkConfig(parsed.config);
+  const lines: OutputLine[] = [];
+
   for (const w of warnings) lines.push(warn(`⚠ ${w}`));
+  if (errors.length > 0) {
+    for (const e of errors) lines.push(err(`✗ ${e}`));
+    return fail(lines);
+  }
 
   const suffix =
     warnings.length > 0
@@ -595,6 +615,9 @@ function cmdInit(sim: Simulator): CommandResult {
     return fail([err("Error: forkspace.yml already exists here.")]);
   }
   sim.hasConfigFile = true;
+  sim.configYaml = STARTER_CONFIG_YAML;
+  const parsed = parseConfigYaml(STARTER_CONFIG_YAML);
+  if (parsed.ok) sim.config = parsed.config;
   return ok([out("Wrote forkspace.yml. Edit it, then `forkspace check`.")]);
 }
 

@@ -1,7 +1,9 @@
 export interface ScenarioStep {
   title: string;
   description: string;
-  command: string;
+  command?: string;
+  /** Interactive step — no terminal command */
+  action?: "edit-yaml";
   hint?: string;
 }
 
@@ -19,7 +21,7 @@ export const SCENARIOS: Scenario[] = [
   {
     id: "getting-started",
     title: "Getting started",
-    subtitle: "init → check → first up",
+    subtitle: "init → edit → check → first up",
     freshWorkspace: true,
     steps: [
       {
@@ -27,6 +29,13 @@ export const SCENARIOS: Scenario[] = [
         description:
           "Write a starter forkspace.yml at your workspace root. This declares environments, services, ports, and hooks.",
         command: "forkspace init",
+      },
+      {
+        title: "Edit forkspace.yml",
+        description:
+          "Customize your workspace name, services, ports, and isolation levels. The editor on the right opens after init — try changing workspace to your project name, or swap api/ paths to match your repo layout.",
+        action: "edit-yaml",
+        hint: "Starter config uses api/docker-compose.yml — simulated as present in this playground.",
       },
       {
         title: "Validate workspace",
