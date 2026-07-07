@@ -10,6 +10,7 @@ Standard commands live in `package.json` scripts — use those rather than dupli
 - `npm run build` — compile to `dist/` (only needed to exercise the published `bin`/`dist/cli.js`)
 - `npm test` — vitest (`test/forkspace.test.ts`); runs straight from `src` via tsx, no build required
 - `npm run dev -- <args>` — run the CLI from source (e.g. `npm run dev -- check`)
+- `npm run playground` — interactive browser playground (Vite dev server, no Docker)
 
 Non-obvious caveats:
 - The compose-orchestration commands (`up`, `down`, `ls --ps`) shell out to the `docker`

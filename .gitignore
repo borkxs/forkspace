@@ -2,3 +2,4 @@ node_modules/
 dist/
 .forkspace/
 .env.forkspace.*
+playground/dist/
