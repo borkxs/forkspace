@@ -27,6 +27,17 @@ shared — instead of duplicating everything or sharing everything.
 
 ## Scenarios
 
+### All at once
+
+Dev, tests, agent forks, Puppeteer e2e, and a one-off migration can all run
+concurrently on one machine. Each **environment** gets its own port range; within
+an environment, forks **share** or **fork** individual services depending on their
+isolation level — one MySQL container can host many namespace databases while
+DynamoDB stays shared, and `--isolate mysql` spins up a separate container only
+for the fork that needs it.
+
+![All at once](docs/diagrams/all-at-once.svg)
+
 ### Full-stack local dev (QA)
 
 One persistent baseline for day-to-day work. `forkspace up dev` starts the

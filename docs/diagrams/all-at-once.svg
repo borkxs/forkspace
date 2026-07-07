@@ -1,0 +1,163 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="664" viewBox="0 0 880 664" role="img" aria-label="All at once: dev QA, test baseline, agent forks, Puppeteer e2e, and an isolated migration fork running concurrently on one machine; environments use separate port ranges, forks share services per isolation level">
+  <style>
+    .t  { font-family: -apple-system,'Segoe UI',Helvetica,Arial,sans-serif; fill: #E6EDF7; }
+    .s  { font-family: -apple-system,'Segoe UI',Helvetica,Arial,sans-serif; fill: #93A0BC; }
+    .m  { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #9FB0CE; }
+    .mt { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #2DD4BF; }
+    .mo { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #FBA94C; }
+    .mp { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #C4B5FD; }
+    .mg { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #6EE7B7; }
+  </style>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#93A0BC"/>
+    </marker>
+    <marker id="arr-o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FBA94C"/>
+    </marker>
+    <marker id="arr-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6EE7B7"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="880" height="664" rx="14" fill="#0B1020"/>
+
+  <text x="32" y="44" class="t" font-size="20" font-weight="600">All at once &#8212; one machine, every use-case</text>
+  <text x="32" y="70" class="mt" font-size="12">environments get their own ports &#183; forks share or fork services per isolation level</text>
+  <text x="848" y="44" class="s" font-size="12" text-anchor="end">`forkspace check` validates the whole workspace</text>
+
+  <!-- left: use cases -->
+  <rect x="32" y="96" width="248" height="552" rx="10" fill="#111831" stroke="#263050"/>
+  <text x="48" y="120" class="s" font-size="12">concurrent use-cases</text>
+
+  <!-- dev -->
+  <rect x="48" y="136" width="216" height="72" rx="8" fill="#0F2B28" stroke="#2DD4BF" stroke-opacity="0.75"/>
+  <text x="64" y="160" class="t" font-size="13" font-weight="600">dev &#183; QA</text>
+  <text x="64" y="180" class="mt" font-size="10">forkspace up dev</text>
+  <text x="64" y="198" class="s" font-size="10">npm run dev, browser QA</text>
+
+  <!-- test baseline -->
+  <rect x="48" y="220" width="216" height="56" rx="8" fill="#182242" stroke="#2E3B63"/>
+  <text x="64" y="244" class="t" font-size="13" font-weight="600">test &#183; baseline</text>
+  <text x="64" y="264" class="mt" font-size="10">forkspace up test</text>
+
+  <!-- agent-a -->
+  <rect x="48" y="288" width="216" height="56" rx="8" fill="#241A10" stroke="#FBA94C" stroke-opacity="0.75"/>
+  <text x="64" y="312" class="t" font-size="13" font-weight="600">agent-a <tspan class="s" font-size="10" font-weight="400">&#183; slot 1</tspan></text>
+  <text x="64" y="332" class="mo" font-size="10">up test --fork agent-a</text>
+
+  <!-- agent-b -->
+  <rect x="48" y="356" width="216" height="56" rx="8" fill="#241A10" stroke="#FBA94C" stroke-opacity="0.75"/>
+  <text x="64" y="380" class="t" font-size="13" font-weight="600">agent-b <tspan class="s" font-size="10" font-weight="400">&#183; slot 2</tspan></text>
+  <text x="64" y="400" class="mo" font-size="10">up test --fork agent-b</text>
+
+  <!-- e2e -->
+  <rect x="48" y="424" width="216" height="72" rx="8" fill="#241A10" stroke="#FBA94C" stroke-opacity="0.75"/>
+  <text x="64" y="448" class="t" font-size="13" font-weight="600">e2e &#183; Puppeteer <tspan class="s" font-size="10" font-weight="400">&#183; slot 3</tspan></text>
+  <text x="64" y="468" class="mo" font-size="10">up test --fork e2e</text>
+  <text x="64" y="486" class="s" font-size="10">app on FORKSPACE_APP_PORT</text>
+
+  <!-- mig -->
+  <rect x="48" y="508" width="216" height="72" rx="8" fill="#1A130B" stroke="#FBA94C"/>
+  <text x="64" y="532" class="t" font-size="13" font-weight="600">mig-042 <tspan class="s" font-size="10" font-weight="400">&#183; slot 4</tspan></text>
+  <text x="64" y="552" class="mo" font-size="10">--fork mig-042 --isolate mysql</text>
+  <text x="64" y="570" class="s" font-size="10">own MySQL container, shared rest</text>
+
+  <text x="156" y="612" class="s" font-size="10" text-anchor="middle">each writes its own</text>
+  <text x="156" y="628" class="s" font-size="10" text-anchor="middle">`.env.forkspace.*` file</text>
+
+  <!-- arrows from use cases to resources -->
+  <path d="M264,172 C300,172 300,168 336,168" fill="none" stroke="#2DD4BF" stroke-width="1.5" marker-end="url(#arr-g)"/>
+  <path d="M264,248 C300,248 300,310 336,310" fill="none" stroke="#93A0BC" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M264,316 C300,316 300,350 336,350" fill="none" stroke="#FBA94C" stroke-width="1.5" marker-end="url(#arr-o)"/>
+  <path d="M264,384 C300,384 300,350 336,350" fill="none" stroke="#FBA94C" stroke-width="1.5" marker-end="url(#arr-o)"/>
+  <path d="M264,460 C300,460 300,350 336,350" fill="none" stroke="#FBA94C" stroke-width="1.5" marker-end="url(#arr-o)"/>
+  <path d="M264,460 C300,460 300,494 336,494" fill="none" stroke="#FBA94C" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arr-o)"/>
+  <path d="M264,544 C300,544 300,582 336,582" fill="none" stroke="#FBA94C" stroke-width="1.5" marker-end="url(#arr-o)"/>
+  <path d="M264,544 C300,544 300,438 336,438" fill="none" stroke="#FBA94C" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arr-o)"/>
+
+  <!-- right: docker resources -->
+  <rect x="336" y="96" width="512" height="552" rx="10" fill="#111831" stroke="#263050"/>
+  <text x="352" y="120" class="s" font-size="12">Docker on your machine &#8212; shared vs isolated</text>
+
+  <!-- dev stack -->
+  <rect x="352" y="136" width="480" height="108" rx="8" fill="#0C1F1C" stroke="#2DD4BF" stroke-opacity="0.6"/>
+  <text x="368" y="160" class="t" font-size="13" font-weight="600">fs-acme-dev <tspan class="mg" font-size="11" font-weight="400">&#183; persistent &#183; slot 0</tspan></text>
+  <text x="368" y="180" class="s" font-size="10">fully separate from test &#8212; own containers, volumes, ports</text>
+
+  <rect x="368" y="192" width="104" height="40" rx="5" fill="#14203E" stroke="#35548F"/>
+  <text x="420" y="210" class="t" font-size="11" text-anchor="middle">mysql</text>
+  <text x="420" y="225" class="m" font-size="10" text-anchor="middle">:3306</text>
+
+  <rect x="484" y="192" width="104" height="40" rx="5" fill="#14203E" stroke="#35548F"/>
+  <text x="536" y="210" class="t" font-size="11" text-anchor="middle">dynamodb</text>
+  <text x="536" y="225" class="m" font-size="10" text-anchor="middle">:8000</text>
+
+  <rect x="600" y="192" width="104" height="40" rx="5" fill="#14203E" stroke="#35548F"/>
+  <text x="652" y="210" class="t" font-size="11" text-anchor="middle">elasticmq</text>
+  <text x="652" y="225" class="m" font-size="10" text-anchor="middle">:9324</text>
+
+  <rect x="716" y="192" width="104" height="40" rx="5" fill="#14203E" stroke="#35548F"/>
+  <text x="768" y="210" class="t" font-size="11" text-anchor="middle">minio</text>
+  <text x="768" y="225" class="m" font-size="10" text-anchor="middle">:9000</text>
+
+  <!-- test baseline -->
+  <rect x="352" y="260" width="480" height="252" rx="8" fill="#14203E" stroke="#35548F"/>
+  <text x="368" y="284" class="t" font-size="13" font-weight="600">fs-acme-test <tspan class="s" font-size="11" font-weight="400">&#183; baseline &#183; slot 0</tspan></text>
+  <text x="368" y="304" class="s" font-size="10">ephemeral test stack &#8212; most forks attach here</text>
+
+  <!-- mysql with namespaces -->
+  <rect x="368" y="316" width="448" height="72" rx="6" fill="#10192F" stroke="#A78BFA" stroke-opacity="0.7"/>
+  <text x="384" y="338" class="t" font-size="12">mysql <tspan class="mp" font-size="10">isolation: namespace</tspan></text>
+  <text x="800" y="338" class="m" font-size="11" text-anchor="end">127.0.0.1:3406</text>
+
+  <rect x="384" y="352" width="72" height="28" rx="4" fill="#1B1533" stroke="#A78BFA"/>
+  <text x="420" y="371" class="mp" font-size="10" text-anchor="middle">main</text>
+  <rect x="464" y="352" width="72" height="28" rx="4" fill="#1B1533" stroke="#A78BFA"/>
+  <text x="500" y="371" class="mp" font-size="10" text-anchor="middle">agent_a</text>
+  <rect x="544" y="352" width="72" height="28" rx="4" fill="#1B1533" stroke="#A78BFA"/>
+  <text x="580" y="371" class="mp" font-size="10" text-anchor="middle">agent_b</text>
+  <rect x="624" y="352" width="56" height="28" rx="4" fill="#1B1533" stroke="#A78BFA"/>
+  <text x="652" y="371" class="mp" font-size="10" text-anchor="middle">e2e</text>
+  <text x="720" y="371" class="s" font-size="9">one container,</text>
+  <text x="720" y="383" class="s" font-size="9">many databases</text>
+
+  <!-- shared services -->
+  <text x="368" y="412" class="s" font-size="10">isolation: shared &#8212; all namespace forks hit the same endpoints</text>
+
+  <rect x="368" y="422" width="140" height="28" rx="5" fill="#151C30" stroke="#3D4A6E"/>
+  <text x="438" y="441" class="t" font-size="11" text-anchor="middle">dynamodb :8100</text>
+
+  <rect x="522" y="422" width="140" height="28" rx="5" fill="#151C30" stroke="#3D4A6E"/>
+  <text x="592" y="441" class="t" font-size="11" text-anchor="middle">elasticmq :9424</text>
+
+  <rect x="676" y="422" width="140" height="28" rx="5" fill="#151C30" stroke="#3D4A6E"/>
+  <text x="746" y="441" class="t" font-size="11" text-anchor="middle">minio :9100</text>
+
+  <!-- app allocation note -->
+  <rect x="368" y="476" width="448" height="36" rx="6" fill="#1A1530" stroke="#A78BFA" stroke-opacity="0.5"/>
+  <text x="384" y="498" class="s" font-size="10">allocation <tspan class="mp">app</tspan> &#8594; :4130 for e2e fork (slot 3) &#8212; forkspace reserves the port, you start the app</text>
+
+  <!-- isolated fork -->
+  <rect x="352" y="524" width="480" height="88" rx="8" fill="#1A130B" stroke="#FBA94C" stroke-opacity="0.8"/>
+  <text x="368" y="548" class="t" font-size="13" font-weight="600">fs-acme-test-mig-042 <tspan class="mo" font-size="11" font-weight="400">&#183; slot 4 &#183; container-isolated mysql only</tspan></text>
+
+  <rect x="368" y="560" width="200" height="44" rx="6" fill="#241A10" stroke="#FBA94C"/>
+  <text x="384" y="578" class="t" font-size="12">mysql <tspan class="mo" font-size="10">own volume</tspan></text>
+  <text x="384" y="594" class="m" font-size="11">127.0.0.1:3446 &#183; db mig_042</text>
+
+  <rect x="584" y="560" width="232" height="44" rx="6" fill="#151C30" stroke="#3D4A6E"/>
+  <text x="600" y="578" class="t" font-size="11">dynamo &#183; queue &#183; s3</text>
+  <text x="600" y="594" class="s" font-size="10">still shared with baseline (:8100 &#183; :9424 &#183; :9100)</text>
+
+  <!-- legend -->
+  <rect x="352" y="628" width="480" height="1" fill="#263050"/>
+  <circle cx="372" cy="644" r="5" fill="#2DD4BF"/>
+  <text x="384" y="648" class="s" font-size="10">separate environment</text>
+  <circle cx="508" cy="644" r="5" fill="#A78BFA"/>
+  <text x="520" y="648" class="s" font-size="10">namespace (shared container)</text>
+  <circle cx="668" cy="644" r="5" fill="#3D4A6E"/>
+  <text x="680" y="648" class="s" font-size="10">shared service</text>
+  <circle cx="792" cy="644" r="5" fill="#FBA94C"/>
+  <text x="804" y="648" class="s" font-size="10">container fork</text>
+</svg>
