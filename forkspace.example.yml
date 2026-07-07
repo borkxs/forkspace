@@ -53,6 +53,7 @@ environments:
   # test baseline — per-service isolation levels.
   test:
     persistent: false
+    baselineNs: main
     allocations:
       app:
         basePort: 4100
@@ -98,3 +99,10 @@ environments:
       forkCreate: my-api/scripts/fork-create.sh
       forkDestroy: my-api/scripts/fork-destroy.sh
       listNamespaces: my-api/scripts/list-namespaces.sh
+
+# fork-create.sh recipe (clone-from-baseline):
+#   mysqldump -h127.0.0.1 -P"$FORKSPACE_BASELINE_MYSQL_PORT" \
+#     "$FORKSPACE_BASELINE_NS" | mysql -h127.0.0.1 -P"$FORKSPACE_MYSQL_PORT" "$FORKSPACE_NS"
+# Works for namespace forks (shared baseline port) and --isolate forks (baseline
+# port from FORKSPACE_BASELINE_*; fork port from FORKSPACE_MYSQL_PORT).
+# For S3 buckets use {nsdash}: S3_BUCKET: "app{nsdash}" → app-wip-billing.

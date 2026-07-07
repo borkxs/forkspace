@@ -111,7 +111,10 @@ own processes and engine-specific SQL/SDK calls.
 
 Namespace tokens are derived from the fork name: lowercase `[a-z0-9_]+`, dashes
 → underscores, prefixed with `f_` if they would start with a digit, max 32
-characters. Empty for the baseline.
+characters. A dashed variant (`{nsdash}`, `FORKSPACE_NS_DASH`) is also minted
+for engines that forbid underscores (S3 buckets, DNS labels). Set
+`baselineNs` on an environment (e.g. `main`) so the baseline's `{ns}` templates
+and `FORKSPACE_NS` render correctly instead of empty.
 
 ## Install
 
@@ -165,18 +168,44 @@ for orphan detection. With the hook configured, `ls --orphans` reports:
 When the hook is absent or the baseline is not up, orphan detection degrades
 gracefully with a skip message.
 
+`listNamespaces` returns one list per environment — configure it to report the
+engine that is the source of truth for namespace identity (typically MySQL).
+A namespace may materialize across several engines (database, key prefix,
+bucket); if partial creation is a concern, aggregate in the hook (e.g. union
+of all engines) rather than relying on a single engine's view.
+
+Hooks are only as reliable as your compose healthchecks: `up --wait` trusts
+them, so a healthcheck that passes before the service is actually ready
+(e.g. `mysqladmin ping` over the socket before TCP accepts connections) can
+cause hook failures. Prefer protocol-specific checks
+(`mysqladmin ping -h 127.0.0.1 --protocol=tcp`).
+
 ## Env file contract
 
 Every instance writes `.env.forkspace.<env>[.<fork>]` with:
 
-- `FORKSPACE_ENV`, `FORKSPACE_FORK`, `FORKSPACE_NS`, `FORKSPACE_<SERVICE>_PORT`,
-  `FORKSPACE_<SERVICE>_HOST`
+- `FORKSPACE_ENV`, `FORKSPACE_FORK`, `FORKSPACE_NS`, `FORKSPACE_NS_DASH` (forks),
+  `FORKSPACE_INVOKE_DIR` (directory where the CLI was invoked),
+  `FORKSPACE_<SERVICE>_PORT`, `FORKSPACE_<SERVICE>_HOST`
+- `FORKSPACE_BASELINE_NS`, `FORKSPACE_BASELINE_<SERVICE>_HOST/_PORT` (forks only;
+  baseline addresses from state — use in `forkCreate` for clone-from-baseline)
 - `FORKSPACE_<ALLOCATION>_PORT` for named port allocations (reserved slots
   forkspace exports but does not start processes for)
 - Your templated exports (`DATABASE_URL`, etc.) with `{host}`, `{port}`, `{ns}`,
-  `{_ns}` substituted
+  `{_ns}`, `{ns_}`, `{nsdash}`, `{_nsdash}`, `{nsdash_}` substituted
 
 Apps, tests, CI, and agents all consume the same contract.
+
+### Binding a fork to a checkout
+
+Hooks run with `cwd = workspace root` against the primary checkout. To bind a
+fork to the checkout you invoked from:
+
+1. Run `up` from inside the worktree (`cd worktree && forkspace up test --fork review-x`).
+   Hooks can resolve paths via `$FORKSPACE_INVOKE_DIR` (e.g.
+   `$FORKSPACE_INVOKE_DIR/migrations`).
+2. CI-style: `up --no-hooks`, then run migrate/seed yourself from the correct
+   checkout with the fork's env file sourced.
 
 ## How ports and slots work
 

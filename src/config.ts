@@ -25,7 +25,8 @@ export const ServiceSchema = z.object({
   isolation: z.enum(["container", "namespace", "shared"]).default("container"),
   /**
    * Extra env vars to emit into the generated env file.
-   * Values are templates: {port}, {host}, {service}, {ns}, {_ns}, {ns_} are substituted.
+   * Values are templates: {port}, {host}, {service}, {ns}, {_ns}, {ns_},
+   * {nsdash}, {_nsdash}, {nsdash_} are substituted.
    * e.g. DATABASE_URL: "mysql://root:root@{host}:{port}/app"
    */
   exports: z.record(z.string(), z.string()).default({}),
@@ -72,6 +73,15 @@ export const AllocationSchema = z.object({
 export type AllocationDef = z.infer<typeof AllocationSchema>;
 
 export const EnvironmentSchema = z.object({
+  /**
+   * Namespace token for the baseline (slot 0) instance. When set, `{ns}` templates
+   * and `FORKSPACE_NS` render this value instead of empty — e.g. `main` so hooks
+   * and apps need no `${FORKSPACE_NS:-main}` fallback.
+   */
+  baselineNs: z
+    .string()
+    .regex(/^[a-z0-9_]+$/, "baselineNs must be lowercase [a-z0-9_]+")
+    .optional(),
   /**
    * persistent: `down` keeps volumes (dev). Otherwise `down` runs with -v
    * and instances are truly ephemeral (test).
@@ -190,9 +200,18 @@ function isSharedBaselinePair(a: PortClaim, b: PortClaim): boolean {
   return sameComposeService(a, b) && a.basePort === b.basePort;
 }
 
+const NS_TEMPLATE_TOKENS = [
+  "{ns}",
+  "{_ns}",
+  "{ns_}",
+  "{nsdash}",
+  "{_nsdash}",
+  "{nsdash_}",
+];
+
 function exportTemplatesUseNs(exports: Record<string, string>): boolean {
-  return Object.values(exports).some(
-    (v) => v.includes("{ns}") || v.includes("{_ns}") || v.includes("{ns_}")
+  return Object.values(exports).some((v) =>
+    NS_TEMPLATE_TOKENS.some((t) => v.includes(t))
   );
 }
 
@@ -246,7 +265,7 @@ export function checkConfig(config: Config, root: string): CheckResult {
 
       if (svc.isolation === "namespace" && !exportTemplatesUseNs(svc.exports)) {
         warnings.push(
-          `${envName}.${svcName}: namespace isolation but exports omit {ns}/{_ns} — ` +
+          `${envName}.${svcName}: namespace isolation but exports omit {ns}/{_ns}/{nsdash} — ` +
             `forks would silently share the baseline namespace.`
         );
       }

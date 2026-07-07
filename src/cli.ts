@@ -80,6 +80,7 @@ export async function doUp(
 ): Promise<void> {
   const env = resolveEnv(config, envName);
   const fork = opts.fork ?? null;
+  const invokeDir = process.cwd();
   if (fork) {
     validateForkName(fork);
   }
@@ -104,6 +105,7 @@ export async function doUp(
         envName,
         workspace: config.workspace,
         state,
+        baselineNs: env.baselineNs,
       });
     }
 
@@ -142,13 +144,20 @@ export async function doUp(
       );
     }
 
+    const baseline = state.instances[envName];
     const content = renderEnvFile({
       env: envName,
       fork,
       project: plan.project,
       ns: plan.ns,
+      nsDash: plan.nsDash,
+      invokeDir,
       entries: plan.envEntries,
       allocations: plan.allocationEntries,
+      baseline:
+        fork && baseline
+          ? { ns: baseline.ns, ports: baseline.ports }
+          : undefined,
     });
     const envFile = envFileName(envName, fork);
 
@@ -204,12 +213,81 @@ export async function doUp(
 
   if (opts.hooks && plan.hooks.up.length > 0) {
     const hookEnv = envToRecord(content);
-    for (const cmd of plan.hooks.up) {
-      console.log(`  hook: ${cmd}`);
-      runHook(root, cmd, hookEnv);
+    try {
+      for (const cmd of plan.hooks.up) {
+        console.log(`  hook: ${cmd}`);
+        runHook(root, cmd, hookEnv);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`  hook failed: ${msg}`);
+      await rollbackFailedUp(root, env, fork, plan, envFile);
+      throw new Error(`${msg} (rolled back ${plan.key})`);
     }
   }
   console.log(`✓ ${plan.key} is up`);
+}
+
+async function rollbackFailedUp(
+  root: string,
+  env: EnvironmentDef,
+  fork: string | null,
+  plan: InstancePlan,
+  envFile: string
+): Promise<void> {
+  const rolledBack: string[] = [];
+
+  if (fork && env.hooks.forkDestroy) {
+    const envFilePath = path.join(root, envFile);
+    if (existsSync(envFilePath)) {
+      const hookEnv = envToRecord(readFileSync(envFilePath, "utf8"));
+      console.log(`  rollback forkDestroy: ${env.hooks.forkDestroy}`);
+      try {
+        runHook(root, env.hooks.forkDestroy, hookEnv);
+        rolledBack.push("forkDestroy");
+      } catch (destroyErr) {
+        const msg = destroyErr instanceof Error ? destroyErr.message : String(destroyErr);
+        console.error(`  rollback forkDestroy failed: ${msg}`);
+      }
+    }
+  }
+
+  if (plan.containersToStart.length > 0) {
+    const removeVolumes = !env.persistent;
+    console.log(`  rollback compose down (project ${plan.project})`);
+    try {
+      composeDown(root, plan.project, removeVolumes);
+      rolledBack.push("containers");
+    } catch (downErr) {
+      const msg = downErr instanceof Error ? downErr.message : String(downErr);
+      console.error(`  rollback compose down failed: ${msg}`);
+    }
+  }
+
+  const overrideDir = path.join(root, ".forkspace", plan.project);
+  if (existsSync(overrideDir)) {
+    rmSync(overrideDir, { recursive: true });
+    rolledBack.push("override dir");
+  }
+
+  const envFilePath = path.join(root, envFile);
+  if (existsSync(envFilePath)) {
+    rmSync(envFilePath);
+    rolledBack.push("env file");
+  }
+
+  await withStateLock(root, () => {
+    const state = loadState(root);
+    if (state.instances[plan.key]) {
+      delete state.instances[plan.key];
+      saveState(root, state);
+      rolledBack.push("state");
+    }
+  });
+
+  if (rolledBack.length > 0) {
+    console.log(`  rolled back: ${rolledBack.join(", ")}`);
+  }
 }
 
 export async function doDown(
@@ -453,6 +531,7 @@ environments:
 
   test:
     persistent: false
+    baselineNs: main
     allocations:
       app:
         basePort: 4100

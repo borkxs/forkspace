@@ -37,11 +37,21 @@ export function assertNoForkCollisions(opts: {
   envName: string;
   workspace: string;
   state: State;
+  baselineNs?: string;
 }): void {
-  const { fork, envName, workspace, state } = opts;
+  const { fork, envName, workspace, state, baselineNs } = opts;
   const newKey = instanceKey(envName, fork);
   const newProject = projectName(workspace, envName, fork);
   const newNs = nsFor(fork);
+  const baselineToken =
+    baselineNs ?? state.instances[envName]?.ns ?? "";
+
+  if (newNs && baselineToken && newNs === baselineToken) {
+    throw new Error(
+      `Fork "${fork}" maps to namespace token "${newNs}", which is reserved for the ` +
+        `baseline instance. Choose a different fork name.`
+    );
+  }
 
   for (const inst of Object.values(state.instances)) {
     if (inst.key === newKey) continue;
