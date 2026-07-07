@@ -170,11 +170,11 @@ export function createSimulator(): Simulator {
   };
 }
 
-export function resetSimulator(sim: Simulator): void {
+export function resetSimulator(sim: Simulator, opts?: { freshWorkspace?: boolean }): void {
   sim.state = { instances: {} };
-  sim.hasConfigFile = true;
   sim.config = structuredClone(DEMO_CONFIG);
   sim.engineNamespaces = { test: ["main", "agent_a", "agent_b"] };
+  sim.hasConfigFile = !opts?.freshWorkspace;
 }
 
 export interface ParsedCommand {

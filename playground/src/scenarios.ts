@@ -10,6 +10,8 @@ export interface Scenario {
   title: string;
   subtitle: string;
   diagram?: string;
+  /** Reset to empty workspace (no forkspace.yml) before the walkthrough */
+  freshWorkspace?: boolean;
   steps: ScenarioStep[];
 }
 
@@ -18,6 +20,7 @@ export const SCENARIOS: Scenario[] = [
     id: "getting-started",
     title: "Getting started",
     subtitle: "init → check → first up",
+    freshWorkspace: true,
     steps: [
       {
         title: "Initialize config",

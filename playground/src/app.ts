@@ -6,6 +6,7 @@ import {
   runCommand,
   type Simulator,
 } from "./sim/engine";
+import type { CommandResult } from "./sim/types";
 import { GuiPanel, type CommandName } from "./ui/gui";
 import { Terminal } from "./ui/terminal";
 
@@ -102,10 +103,14 @@ export class App {
   }
 
   private startScenario(scenario: Scenario): void {
+    resetSimulator(this.sim, { freshWorkspace: scenario.freshWorkspace });
     this.activeScenario = scenario;
     this.stepIdx = 0;
     const guideSection = this.root.querySelector("#scenario-guide")!;
     guideSection.hidden = false;
+    this.terminal.clear();
+    this.terminal.writeBanner();
+    this.gui.refresh();
     this.renderScenarios();
     this.renderStep();
     this.terminal.write([
@@ -114,6 +119,14 @@ export class App {
         text: `── Scenario: ${scenario.title} ──`,
       },
     ]);
+    if (scenario.freshWorkspace) {
+      this.terminal.write([
+        {
+          kind: "stdout",
+          text: "  (fresh workspace — no forkspace.yml yet)",
+        },
+      ]);
+    }
   }
 
   private renderStep(): void {
@@ -135,8 +148,12 @@ export class App {
     `;
 
     this.stepEl.querySelector("#run-step")!.addEventListener("click", () => {
-      this.terminal.runCommand(step.command);
-      this.advanceStep();
+      const result = this.executeCommand(step.command);
+      this.terminal.echoInput(step.command);
+      this.writeResult(result);
+      if (result.exitCode === 0) {
+        this.advanceStep();
+      }
     });
     this.stepEl.querySelector("#next-step")?.addEventListener("click", () => {
       this.advanceStep();
@@ -186,20 +203,27 @@ export class App {
       return;
     }
 
-    const parsed = parseCliInput(trimmed);
+    const result = this.executeCommand(trimmed);
+    this.writeResult(result);
+  }
+
+  private executeCommand(input: string): CommandResult {
+    const parsed = parseCliInput(input);
     if (!parsed) {
-      this.terminal.write([{ kind: "stderr", text: "Error: could not parse command" }]);
-      return;
+      return { lines: [{ kind: "stderr", text: "Error: could not parse command" }], exitCode: 1 };
     }
 
     const result = runCommand(this.sim, parsed);
+    this.gui.refresh();
+    this.syncGuiFromCommand(parsed.command as CommandName, parsed.args, parsed.options);
+    return result;
+  }
+
+  private writeResult(result: CommandResult): void {
     this.terminal.write(result.lines);
     if (result.exitCode !== 0) {
       this.terminal.write([{ kind: "stderr", text: `(exit ${result.exitCode})` }]);
     }
-
-    this.gui.refresh();
-    this.syncGuiFromCommand(parsed.command as CommandName, parsed.args, parsed.options);
   }
 
   private syncGuiFromCommand(
