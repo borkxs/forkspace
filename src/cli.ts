@@ -23,6 +23,7 @@ import {
   composeDown,
   composePs,
   composeUp,
+  listComposeProjects,
   planComposeRuns,
   runHook,
 } from "./compose";
@@ -30,6 +31,11 @@ import { envToRecord, envFileName, renderEnvFile, writeEnvFile } from "./env";
 import { assertNoForkCollisions, validateForkName } from "./fork";
 import { withStateLock } from "./lock";
 import { planInstance, planSlotProbe, type InstancePlan } from "./plan";
+import {
+  formatPrunePlan,
+  planPrune,
+  pruneNeedsForce,
+} from "./prune";
 import {
   hasListNamespacesHook,
   orphanReports,
@@ -72,11 +78,36 @@ function parseIsolateSet(
   return isolateSet;
 }
 
+export async function rollbackFailedUp(
+  root: string,
+  envName: string,
+  env: EnvironmentDef,
+  plan: InstancePlan,
+  fork: string | null,
+  composeStarted: boolean
+): Promise<void> {
+  if (composeStarted) {
+    composeDown(root, plan.project, !env.persistent);
+  }
+
+  const overrideDir = path.join(root, ".forkspace", plan.project);
+  if (existsSync(overrideDir)) rmSync(overrideDir, { recursive: true });
+
+  const envFilePath = path.join(root, envFileName(envName, fork));
+  if (existsSync(envFilePath)) rmSync(envFilePath);
+
+  await withStateLock(root, () => {
+    const state = loadState(root);
+    delete state.instances[plan.key];
+    saveState(root, state);
+  });
+}
+
 export async function doUp(
   root: string,
   config: Config,
   envName: string,
-  opts: { fork?: string; isolate?: string; hooks: boolean }
+  opts: { fork?: string; isolate?: string; hooks: boolean; noRollback?: boolean }
 ): Promise<void> {
   const env = resolveEnv(config, envName);
   const fork = opts.fork ?? null;
@@ -203,13 +234,26 @@ export async function doUp(
     console.log(`  (no container services — namespace-only fork)`);
   }
 
-  if (plan.containersToStart.length > 0) {
-    const runs = planComposeRuns(root, plan.project, plan.containersToStart);
-    for (const run of runs) composeUp(root, run);
-  }
+  let composeStarted = false;
+  try {
+    if (plan.containersToStart.length > 0) {
+      const runs = planComposeRuns(root, plan.project, plan.containersToStart);
+      for (const run of runs) {
+        composeUp(root, run);
+        composeStarted = true;
+      }
+    }
 
-  writeEnvFile(root, envName, fork, content);
-  console.log(`  env file → ${envFile}`);
+    writeEnvFile(root, envName, fork, content);
+    console.log(`  env file → ${envFile}`);
+  } catch (err) {
+    if (!opts.noRollback) {
+      await rollbackFailedUp(root, envName, env, plan, fork, composeStarted);
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`up failed; rolled back started resources for ${plan.key}: ${msg}`);
+    }
+    throw err;
+  }
 
   if (opts.hooks && plan.hooks.up.length > 0) {
     const hookEnv = envToRecord(content);
@@ -359,6 +403,51 @@ export async function doDown(
   });
 }
 
+export function doPrune(
+  root: string,
+  config: Config,
+  opts: { dryRun?: boolean; force?: boolean }
+): void {
+  const state = loadState(root);
+  const dockerProjects = listComposeProjects(root);
+  const plan = planPrune(root, config, state, dockerProjects, !!opts.force);
+
+  if (
+    plan.projects.length === 0 &&
+    plan.overrideDirs.length === 0 &&
+    plan.envFiles.length === 0
+  ) {
+    console.log("Nothing to prune.");
+    return;
+  }
+
+  if (!opts.dryRun && pruneNeedsForce(plan)) {
+    throw new Error(
+      "Some stranded projects have unknown environments; pass --force to drop their volumes, " +
+        "or use --dry-run to inspect."
+    );
+  }
+
+  const lines = formatPrunePlan(plan, root);
+  for (const line of lines) {
+    console.log(opts.dryRun ? `would remove ${line}` : `removing ${line}`);
+  }
+
+  if (opts.dryRun) return;
+
+  for (const { project, removeVolumes } of plan.projects) {
+    composeDown(root, project, removeVolumes);
+  }
+  for (const dir of plan.overrideDirs) {
+    rmSync(dir, { recursive: true });
+  }
+  for (const file of plan.envFiles) {
+    rmSync(path.join(root, file));
+  }
+
+  console.log(`✓ pruned ${lines.length} item${lines.length === 1 ? "" : "s"}`);
+}
+
 function loadInstanceEnv(root: string, envFileRel: string): Record<string, string> {
   const envFilePath = path.join(root, envFileRel);
   if (!existsSync(envFilePath)) {
@@ -424,7 +513,8 @@ program
     "comma-separated services to run as container-isolated for this fork (overrides config isolation)"
   )
   .option("--no-hooks", "skip lifecycle hooks")
-  .action(async (envName: string, opts: { fork?: string; isolate?: string; hooks: boolean }) => {
+  .option("--no-rollback", "leave partial resources in place when compose up fails")
+  .action(async (envName: string, opts: { fork?: string; isolate?: string; hooks: boolean; noRollback?: boolean }) => {
     const { root, config } = ctx();
     await doUp(root, config, envName, opts);
   });
@@ -439,6 +529,16 @@ program
   .action(async (envName: string, opts: { fork?: string; keepVolumes?: boolean; force?: boolean }) => {
     const { root, config } = ctx();
     await doDown(root, config, envName, opts);
+  });
+
+program
+  .command("prune")
+  .description("Remove docker compose projects and workspace artifacts not tracked in state")
+  .option("--dry-run", "print what would be removed without making changes")
+  .option("--force", "drop volumes for stranded projects even when the environment is unknown")
+  .action((opts: { dryRun?: boolean; force?: boolean }) => {
+    const { root, config } = ctx();
+    doPrune(root, config, opts);
   });
 
 program
