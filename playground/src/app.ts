@@ -54,9 +54,9 @@ export class App {
         </aside>
         <main class="main-panel">
           <div id="terminal-mount"></div>
+          <div id="yaml-mount"></div>
         </main>
         <aside class="right-panel">
-          <div id="yaml-mount"></div>
           <div id="gui-mount"></div>
         </aside>
       </div>
@@ -78,6 +78,7 @@ export class App {
     });
 
     this.renderScenarios();
+    this.yamlEditor.refresh();
 
     this.root.querySelector("#reset-btn")!.addEventListener("click", () => {
       resetSimulator(this.sim);
@@ -176,6 +177,9 @@ export class App {
         this.writeResult(result);
         this.yamlEditor.refresh();
         if (result.exitCode === 0) {
+          if (step.command === "forkspace init") {
+            this.yamlEditor.focus();
+          }
           this.advanceStep();
         }
       });
@@ -241,6 +245,9 @@ export class App {
     const result = runCommand(this.sim, parsed);
     this.gui.refresh();
     this.yamlEditor.refresh();
+    if (parsed.command === "init" && result.exitCode === 0) {
+      this.yamlEditor.focus();
+    }
     this.syncGuiFromCommand(parsed.command as CommandName, parsed.args, parsed.options);
     return result;
   }
