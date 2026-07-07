@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="880" height="760" viewBox="0 0 880 760" role="img" aria-label="How namespacing works: three columns show each use-case env file, the shared baseline containers and ports, and the per-engine resources hooks materialize from one namespace token  databases, DynamoDB table prefixes, and S3 buckets">
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="760" viewBox="0 0 880 760" role="img" aria-label="How namespacing works: three columns show each use-case env file, the shared baseline containers and ports, and the per-engine resources hooks materialize from one namespace token &#8212; databases, DynamoDB table prefixes, and S3 buckets">
   <style>
     .t  { font-family: -apple-system,'Segoe UI',Helvetica,Arial,sans-serif; fill: #E6EDF7; }
     .s  { font-family: -apple-system,'Segoe UI',Helvetica,Arial,sans-serif; fill: #93A0BC; }
@@ -62,19 +62,6 @@
   <rect x="608" y="282" width="224" height="28" rx="4" fill="#241A10" stroke="#FBA94C" stroke-opacity="0.6"/>
   <text x="620" y="300" class="mo" font-size="10">S3 bucket <tspan class="m">app</tspan> <tspan class="s" font-size="9">(bootstrap)</tspan></text>
 
-  <!-- port arrows row 1 -->
-  <path d="M252,250 L276,250 L276,214 L292,214" fill="none" stroke="#7DD3FC" stroke-width="1.5" marker-end="url(#arr-b)"/>
-  <text x="264" y="232" class="mb" font-size="9">:3406</text>
-  <path d="M252,286 L276,286 L276,278 L292,278" fill="none" stroke="#C4B5FD" stroke-width="1.5" marker-end="url(#arr-p)"/>
-  <text x="264" y="270" class="mp" font-size="9">:8100</text>
-  <path d="M252,310 L276,310 L276,342 L292,342" fill="none" stroke="#FBA94C" stroke-width="1.5" marker-end="url(#arr-o)"/>
-  <text x="264" y="328" class="mo" font-size="9">:9100</text>
-
-  <!-- namespace arrows row 1 -->
-  <path d="M252,246 L560,246 L560,208 L588,208" fill="none" stroke="#7DD3FC" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-b)"/>
-  <path d="M252,298 L548,298 L548,252 L588,252" fill="none" stroke="#C4B5FD" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-p)"/>
-  <path d="M252,314 L536,314 L536,296 L588,296" fill="none" stroke="#FBA94C" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-o)"/>
-
   <!-- ========== ROW 2: wip-billing ========== -->
   <rect x="32" y="348" width="220" height="168" rx="8" fill="#241A10" stroke="#FBA94C" stroke-opacity="0.75"/>
   <text x="48" y="372" class="t" font-size="13" font-weight="600">fork wip-billing</text>
@@ -99,19 +86,6 @@
   <rect x="608" y="470" width="224" height="28" rx="4" fill="#241A10" stroke="#FBA94C" stroke-opacity="0.6"/>
   <text x="620" y="488" class="mo" font-size="10">S3 bucket <tspan class="m">app-wip-billing</tspan></text>
 
-  <!-- port arrows row 2  same baseline ports -->
-  <path d="M252,438 L276,438 L276,214 L292,214" fill="none" stroke="#7DD3FC" stroke-width="1.5" stroke-opacity="0.7" marker-end="url(#arr-b)"/>
-  <text x="268" y="320" class="mb" font-size="9" transform="rotate(-90 268 320)">:3406</text>
-  <path d="M252,474 L276,474 L276,278 L292,278" fill="none" stroke="#C4B5FD" stroke-width="1.5" stroke-opacity="0.7" marker-end="url(#arr-p)"/>
-  <text x="268" y="370" class="mp" font-size="9" transform="rotate(-90 268 370)">:8100</text>
-  <path d="M252,498 L276,498 L276,342 L292,342" fill="none" stroke="#FBA94C" stroke-width="1.5" stroke-opacity="0.7" marker-end="url(#arr-o)"/>
-  <text x="268" y="418" class="mo" font-size="9" transform="rotate(-90 268 418)">:9100</text>
-
-  <!-- namespace arrows row 2 -->
-  <path d="M252,434 L564,434 L564,396 L588,396" fill="none" stroke="#7DD3FC" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-b)"/>
-  <path d="M252,486 L552,486 L552,440 L588,440" fill="none" stroke="#C4B5FD" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-p)"/>
-  <path d="M252,502 L540,502 L540,484 L588,484" fill="none" stroke="#FBA94C" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-o)"/>
-
   <!-- ========== ROW 3: agent-a ========== -->
   <rect x="32" y="536" width="220" height="168" rx="8" fill="#241A10" stroke="#FBA94C" stroke-opacity="0.75"/>
   <text x="48" y="560" class="t" font-size="13" font-weight="600">fork agent-a</text>
@@ -135,16 +109,6 @@
 
   <rect x="608" y="658" width="224" height="28" rx="4" fill="#241A10" stroke="#FBA94C" stroke-opacity="0.6"/>
   <text x="620" y="676" class="mo" font-size="10">S3 bucket <tspan class="m">app-agent-a</tspan></text>
-
-  <!-- port arrows row 3 -->
-  <path d="M252,626 L280,626 L280,214 L292,214" fill="none" stroke="#7DD3FC" stroke-width="1.5" stroke-opacity="0.5" marker-end="url(#arr-b)"/>
-  <path d="M252,662 L280,662 L280,278 L292,278" fill="none" stroke="#C4B5FD" stroke-width="1.5" stroke-opacity="0.5" marker-end="url(#arr-p)"/>
-  <path d="M252,686 L280,686 L280,342 L292,342" fill="none" stroke="#FBA94C" stroke-width="1.5" stroke-opacity="0.5" marker-end="url(#arr-o)"/>
-
-  <!-- namespace arrows row 3 -->
-  <path d="M252,622 L568,622 L568,584 L588,584" fill="none" stroke="#7DD3FC" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-b)"/>
-  <path d="M252,674 L556,674 L556,628 L588,628" fill="none" stroke="#C4B5FD" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-p)"/>
-  <path d="M252,690 L544,690 L544,672 L588,672" fill="none" stroke="#FBA94C" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-o)"/>
 
   <!-- ========== MIDDLE: baseline containers (spans all rows) ========== -->
   <rect x="276" y="160" width="288" height="544" rx="10" fill="#111831" stroke="#263050"/>
@@ -186,6 +150,43 @@
   <text x="308" y="644" class="m" font-size="9">mysql:    DATABASE_URL: "..../{ns}"</text>
   <text x="308" y="660" class="m" font-size="9">dynamodb: DYNAMO_PREFIX: "{ns_}"</text>
   <text x="308" y="676" class="m" font-size="9">s3:       S3_BUCKET: "app{nsdash}"</text>
+
+  <!-- arrows (on top of columns) -->
+  <!-- port arrows row 1 -->
+  <path d="M252,250 L276,250 L276,214 L292,214" fill="none" stroke="#7DD3FC" stroke-width="1.5" marker-end="url(#arr-b)"/>
+  <text x="264" y="232" class="mb" font-size="9">:3406</text>
+  <path d="M252,286 L276,286 L276,278 L292,278" fill="none" stroke="#C4B5FD" stroke-width="1.5" marker-end="url(#arr-p)"/>
+  <text x="264" y="270" class="mp" font-size="9">:8100</text>
+  <path d="M252,310 L276,310 L276,342 L292,342" fill="none" stroke="#FBA94C" stroke-width="1.5" marker-end="url(#arr-o)"/>
+  <text x="264" y="328" class="mo" font-size="9">:9100</text>
+
+  <!-- namespace arrows row 1 -->
+  <path d="M252,246 L560,246 L560,208 L588,208" fill="none" stroke="#7DD3FC" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-b)"/>
+  <path d="M252,298 L548,298 L548,252 L588,252" fill="none" stroke="#C4B5FD" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-p)"/>
+  <path d="M252,314 L536,314 L536,296 L588,296" fill="none" stroke="#FBA94C" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-o)"/>
+
+  <!-- port arrows row 2 — same baseline ports -->
+  <path d="M252,438 L276,438 L276,214 L292,214" fill="none" stroke="#7DD3FC" stroke-width="1.5" stroke-opacity="0.7" marker-end="url(#arr-b)"/>
+  <text x="268" y="320" class="mb" font-size="9" transform="rotate(-90 268 320)">:3406</text>
+  <path d="M252,474 L276,474 L276,278 L292,278" fill="none" stroke="#C4B5FD" stroke-width="1.5" stroke-opacity="0.7" marker-end="url(#arr-p)"/>
+  <text x="268" y="370" class="mp" font-size="9" transform="rotate(-90 268 370)">:8100</text>
+  <path d="M252,498 L276,498 L276,342 L292,342" fill="none" stroke="#FBA94C" stroke-width="1.5" stroke-opacity="0.7" marker-end="url(#arr-o)"/>
+  <text x="268" y="418" class="mo" font-size="9" transform="rotate(-90 268 418)">:9100</text>
+
+  <!-- namespace arrows row 2 -->
+  <path d="M252,434 L564,434 L564,396 L588,396" fill="none" stroke="#7DD3FC" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-b)"/>
+  <path d="M252,486 L552,486 L552,440 L588,440" fill="none" stroke="#C4B5FD" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-p)"/>
+  <path d="M252,502 L540,502 L540,484 L588,484" fill="none" stroke="#FBA94C" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-o)"/>
+
+  <!-- port arrows row 3 -->
+  <path d="M252,626 L280,626 L280,214 L292,214" fill="none" stroke="#7DD3FC" stroke-width="1.5" stroke-opacity="0.5" marker-end="url(#arr-b)"/>
+  <path d="M252,662 L280,662 L280,278 L292,278" fill="none" stroke="#C4B5FD" stroke-width="1.5" stroke-opacity="0.5" marker-end="url(#arr-p)"/>
+  <path d="M252,686 L280,686 L280,342 L292,342" fill="none" stroke="#FBA94C" stroke-width="1.5" stroke-opacity="0.5" marker-end="url(#arr-o)"/>
+
+  <!-- namespace arrows row 3 -->
+  <path d="M252,622 L568,622 L568,584 L588,584" fill="none" stroke="#7DD3FC" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-b)"/>
+  <path d="M252,674 L556,674 L556,628 L588,628" fill="none" stroke="#C4B5FD" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-p)"/>
+  <path d="M252,690 L544,690 L544,672 L588,672" fill="none" stroke="#FBA94C" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-o)"/>
 
   <!-- bottom legend -->
   <rect x="32" y="720" width="816" height="1" fill="#263050"/>
