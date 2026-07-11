@@ -38,6 +38,16 @@ for the fork that needs it.
 
 ![All at once](docs/diagrams/all-at-once.svg)
 
+### How namespacing works
+
+One namespace token fans out across engines — each with its own natural isolation
+mechanism. Forkspace substitutes `{ns}`, `{ns_}`, and `{nsdash}` into export
+templates; your `forkCreate` / `forkDestroy` hooks materialize the resources.
+All forks share the same container endpoints (solid arrows); only the names differ
+(dashed arrows).
+
+![How namespacing works](docs/diagrams/namespacing.svg)
+
 ### Full-stack local dev (QA)
 
 One persistent baseline for day-to-day work. `forkspace up dev` starts the

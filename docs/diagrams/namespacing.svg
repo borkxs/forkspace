@@ -1,0 +1,200 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="760" viewBox="0 0 880 760" role="img" aria-label="How namespacing works: three columns show each use-case env file, the shared baseline containers and ports, and the per-engine resources hooks materialize from one namespace token &#8212; databases, DynamoDB table prefixes, and S3 buckets">
+  <style>
+    .t  { font-family: -apple-system,'Segoe UI',Helvetica,Arial,sans-serif; fill: #E6EDF7; }
+    .s  { font-family: -apple-system,'Segoe UI',Helvetica,Arial,sans-serif; fill: #93A0BC; }
+    .m  { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #9FB0CE; }
+    .mt { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #2DD4BF; }
+    .mo { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #FBA94C; }
+    .mp { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #C4B5FD; }
+    .mb { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #7DD3FC; }
+    .mg { font-family: 'SFMono-Regular',Consolas,Menlo,monospace; fill: #6EE7B7; }
+  </style>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#93A0BC"/>
+    </marker>
+    <marker id="arr-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DD3FC"/>
+    </marker>
+    <marker id="arr-p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#C4B5FD"/>
+    </marker>
+    <marker id="arr-o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FBA94C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="880" height="760" rx="14" fill="#0B1020"/>
+
+  <text x="32" y="40" class="t" font-size="20" font-weight="600">How namespacing works &#8212; one token, many engines</text>
+  <text x="32" y="66" class="s" font-size="12">forkspace mints the name and port; your hooks materialize engine-specific isolation</text>
+
+  <!-- token minting strip -->
+  <rect x="32" y="82" width="816" height="36" rx="6" fill="#10192F" stroke="#2DD4BF" stroke-opacity="0.5"/>
+  <text x="48" y="104" class="s" font-size="11">fork <tspan class="mt">wip-billing</tspan> &#8594; <tspan class="mp">FORKSPACE_NS=wip_billing</tspan> &#183; <tspan class="mp">FORKSPACE_NS_DASH=wip-billing</tspan> &#8594; substituted into export templates</text>
+
+  <!-- column headers -->
+  <text x="32" y="144" class="s" font-size="11" font-weight="600">use-case</text>
+  <text x="300" y="144" class="s" font-size="11" font-weight="600">baseline containers <tspan font-weight="400">(shared by all forks)</tspan></text>
+  <text x="592" y="144" class="s" font-size="11" font-weight="600">materialized resources <tspan font-weight="400">(hooks create / drop)</tspan></text>
+
+  <!-- ========== ROW 1: baseline ========== -->
+  <rect x="32" y="160" width="220" height="168" rx="8" fill="#182242" stroke="#2E3B63"/>
+  <text x="48" y="184" class="t" font-size="13" font-weight="600">baseline &#183; test</text>
+  <text x="48" y="204" class="mt" font-size="10">forkspace up test</text>
+  <text x="48" y="224" class="m" font-size="10">.env.forkspace.test</text>
+  <text x="48" y="246" class="mg" font-size="10">FORKSPACE_NS=main</text>
+  <text x="48" y="264" class="s" font-size="10">slot 0 &#183; starts containers</text>
+  <text x="48" y="286" class="mb" font-size="9">DATABASE_URL &#8230;/main</text>
+  <text x="48" y="302" class="mp" font-size="9">DYNAMO_PREFIX=main_</text>
+  <text x="48" y="318" class="mo" font-size="9">S3_BUCKET=app</text>
+
+  <rect x="592" y="160" width="256" height="168" rx="8" fill="#10192F" stroke="#6EE7B7" stroke-opacity="0.6"/>
+  <text x="608" y="184" class="mg" font-size="11" font-weight="600">main</text>
+
+  <rect x="608" y="194" width="224" height="28" rx="4" fill="#14203E" stroke="#7DD3FC" stroke-opacity="0.6"/>
+  <text x="620" y="212" class="mb" font-size="10">MySQL database <tspan class="m">main</tspan></text>
+
+  <rect x="608" y="230" width="224" height="44" rx="4" fill="#1B1533" stroke="#C4B5FD" stroke-opacity="0.6"/>
+  <text x="620" y="248" class="mp" font-size="10">DynamoDB tables</text>
+  <text x="620" y="264" class="m" font-size="9">main_users &#183; main_orders &#183; main_events</text>
+
+  <rect x="608" y="282" width="224" height="28" rx="4" fill="#241A10" stroke="#FBA94C" stroke-opacity="0.6"/>
+  <text x="620" y="300" class="mo" font-size="10">S3 bucket <tspan class="m">app</tspan> <tspan class="s" font-size="9">(bootstrap)</tspan></text>
+
+  <!-- ========== ROW 2: wip-billing ========== -->
+  <rect x="32" y="348" width="220" height="168" rx="8" fill="#241A10" stroke="#FBA94C" stroke-opacity="0.75"/>
+  <text x="48" y="372" class="t" font-size="13" font-weight="600">fork wip-billing</text>
+  <text x="48" y="392" class="mo" font-size="10">up test --fork wip-billing</text>
+  <text x="48" y="412" class="m" font-size="10">.env.forkspace.test.wip-billing</text>
+  <text x="48" y="434" class="mp" font-size="10">FORKSPACE_NS=wip_billing</text>
+  <text x="48" y="452" class="s" font-size="10">slot 1 &#183; namespace-only</text>
+  <text x="48" y="474" class="mb" font-size="9">DATABASE_URL &#8230;/wip_billing</text>
+  <text x="48" y="490" class="mp" font-size="9">DYNAMO_PREFIX=wip_billing_</text>
+  <text x="48" y="506" class="mo" font-size="9">S3_BUCKET=app-wip-billing</text>
+
+  <rect x="592" y="348" width="256" height="168" rx="8" fill="#1B1533" stroke="#C4B5FD" stroke-opacity="0.6"/>
+  <text x="608" y="372" class="mp" font-size="11" font-weight="600">wip_billing</text>
+
+  <rect x="608" y="382" width="224" height="28" rx="4" fill="#14203E" stroke="#7DD3FC" stroke-opacity="0.6"/>
+  <text x="620" y="400" class="mb" font-size="10">MySQL database <tspan class="m">wip_billing</tspan></text>
+
+  <rect x="608" y="418" width="224" height="44" rx="4" fill="#1B1533" stroke="#C4B5FD" stroke-opacity="0.6"/>
+  <text x="620" y="436" class="mp" font-size="10">DynamoDB tables</text>
+  <text x="620" y="452" class="m" font-size="9">wip_billing_users &#183; wip_billing_orders &#8230;</text>
+
+  <rect x="608" y="470" width="224" height="28" rx="4" fill="#241A10" stroke="#FBA94C" stroke-opacity="0.6"/>
+  <text x="620" y="488" class="mo" font-size="10">S3 bucket <tspan class="m">app-wip-billing</tspan></text>
+
+  <!-- ========== ROW 3: agent-a ========== -->
+  <rect x="32" y="536" width="220" height="168" rx="8" fill="#241A10" stroke="#FBA94C" stroke-opacity="0.75"/>
+  <text x="48" y="560" class="t" font-size="13" font-weight="600">fork agent-a</text>
+  <text x="48" y="580" class="mo" font-size="10">up test --fork agent-a</text>
+  <text x="48" y="600" class="m" font-size="10">.env.forkspace.test.agent-a</text>
+  <text x="48" y="622" class="mp" font-size="10">FORKSPACE_NS=agent_a</text>
+  <text x="48" y="640" class="s" font-size="10">slot 2 &#183; namespace-only</text>
+  <text x="48" y="662" class="mb" font-size="9">DATABASE_URL &#8230;/agent_a</text>
+  <text x="48" y="678" class="mp" font-size="9">DYNAMO_PREFIX=agent_a_</text>
+  <text x="48" y="694" class="mo" font-size="9">S3_BUCKET=app-agent-a</text>
+
+  <rect x="592" y="536" width="256" height="168" rx="8" fill="#1B1533" stroke="#C4B5FD" stroke-opacity="0.6"/>
+  <text x="608" y="560" class="mp" font-size="11" font-weight="600">agent_a</text>
+
+  <rect x="608" y="570" width="224" height="28" rx="4" fill="#14203E" stroke="#7DD3FC" stroke-opacity="0.6"/>
+  <text x="620" y="588" class="mb" font-size="10">MySQL database <tspan class="m">agent_a</tspan></text>
+
+  <rect x="608" y="606" width="224" height="44" rx="4" fill="#1B1533" stroke="#C4B5FD" stroke-opacity="0.6"/>
+  <text x="620" y="624" class="mp" font-size="10">DynamoDB tables</text>
+  <text x="620" y="640" class="m" font-size="9">agent_a_users &#183; agent_a_orders &#8230;</text>
+
+  <rect x="608" y="658" width="224" height="28" rx="4" fill="#241A10" stroke="#FBA94C" stroke-opacity="0.6"/>
+  <text x="620" y="676" class="mo" font-size="10">S3 bucket <tspan class="m">app-agent-a</tspan></text>
+
+  <!-- ========== MIDDLE: baseline containers (spans all rows) ========== -->
+  <rect x="276" y="160" width="288" height="544" rx="10" fill="#111831" stroke="#263050"/>
+  <text x="292" y="184" class="s" font-size="11">fs-acme-test &#183; baseline &#183; slot 0</text>
+  <text x="292" y="200" class="s" font-size="10">one compose project &#8212; forks attach here</text>
+
+  <!-- mysql container -->
+  <rect x="292" y="214" width="256" height="88" rx="8" fill="#14203E" stroke="#7DD3FC" stroke-opacity="0.8"/>
+  <text x="308" y="238" class="t" font-size="12">mysql</text>
+  <text x="308" y="256" class="mb" font-size="11">isolation: namespace</text>
+  <text x="532" y="238" class="m" font-size="12" text-anchor="end">127.0.0.1:3406</text>
+  <text x="308" y="278" class="s" font-size="10">one container, many databases</text>
+  <text x="308" y="294" class="m" font-size="9">export: DATABASE_URL=mysql://..:3406/{ns}</text>
+
+  <!-- dynamodb container -->
+  <rect x="292" y="314" width="256" height="88" rx="8" fill="#1B1533" stroke="#C4B5FD" stroke-opacity="0.8"/>
+  <text x="308" y="338" class="t" font-size="12">dynamodb-local</text>
+  <text x="308" y="356" class="mp" font-size="11">isolation: shared</text>
+  <text x="532" y="338" class="m" font-size="12" text-anchor="end">127.0.0.1:8100</text>
+  <text x="308" y="378" class="s" font-size="10">one endpoint, prefixed table names</text>
+  <text x="308" y="394" class="m" font-size="9">export: DYNAMO_PREFIX={ns_}</text>
+
+  <!-- minio container -->
+  <rect x="292" y="414" width="256" height="88" rx="8" fill="#241A10" stroke="#FBA94C" stroke-opacity="0.8"/>
+  <text x="308" y="438" class="t" font-size="12">minio (S3)</text>
+  <text x="308" y="456" class="mo" font-size="11">isolation: namespace</text>
+  <text x="532" y="438" class="m" font-size="12" text-anchor="end">127.0.0.1:9100</text>
+  <text x="308" y="478" class="s" font-size="10">one endpoint, bucket per fork</text>
+  <text x="308" y="494" class="m" font-size="9">export: S3_BUCKET=app{nsdash}</text>
+
+  <!-- middle annotations -->
+  <rect x="292" y="520" width="256" height="72" rx="6" fill="#10192F" stroke="#263050"/>
+  <text x="308" y="542" class="s" font-size="10">solid arrows = same host port</text>
+  <text x="308" y="558" class="s" font-size="10">dashed arrows = namespace token</text>
+  <text x="308" y="574" class="s" font-size="10">&#8594; materialized by forkCreate / forkDestroy</text>
+
+  <rect x="292" y="604" width="256" height="88" rx="6" fill="#0F2B28" stroke="#2DD4BF" stroke-opacity="0.5"/>
+  <text x="308" y="626" class="mt" font-size="10">forkspace.yml exports (example)</text>
+  <text x="308" y="644" class="m" font-size="9">mysql:    DATABASE_URL: "..../{ns}"</text>
+  <text x="308" y="660" class="m" font-size="9">dynamodb: DYNAMO_PREFIX: "{ns_}"</text>
+  <text x="308" y="676" class="m" font-size="9">s3:       S3_BUCKET: "app{nsdash}"</text>
+
+  <!-- arrows (on top of columns) -->
+  <!-- port arrows row 1 -->
+  <path d="M252,250 L276,250 L276,214 L292,214" fill="none" stroke="#7DD3FC" stroke-width="1.5" marker-end="url(#arr-b)"/>
+  <text x="264" y="232" class="mb" font-size="9">:3406</text>
+  <path d="M252,286 L276,286 L276,278 L292,278" fill="none" stroke="#C4B5FD" stroke-width="1.5" marker-end="url(#arr-p)"/>
+  <text x="264" y="270" class="mp" font-size="9">:8100</text>
+  <path d="M252,310 L276,310 L276,342 L292,342" fill="none" stroke="#FBA94C" stroke-width="1.5" marker-end="url(#arr-o)"/>
+  <text x="264" y="328" class="mo" font-size="9">:9100</text>
+
+  <!-- namespace arrows row 1 -->
+  <path d="M252,246 L560,246 L560,208 L588,208" fill="none" stroke="#7DD3FC" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-b)"/>
+  <path d="M252,298 L548,298 L548,252 L588,252" fill="none" stroke="#C4B5FD" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-p)"/>
+  <path d="M252,314 L536,314 L536,296 L588,296" fill="none" stroke="#FBA94C" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-o)"/>
+
+  <!-- port arrows row 2 — same baseline ports -->
+  <path d="M252,438 L276,438 L276,214 L292,214" fill="none" stroke="#7DD3FC" stroke-width="1.5" stroke-opacity="0.7" marker-end="url(#arr-b)"/>
+  <text x="268" y="320" class="mb" font-size="9" transform="rotate(-90 268 320)">:3406</text>
+  <path d="M252,474 L276,474 L276,278 L292,278" fill="none" stroke="#C4B5FD" stroke-width="1.5" stroke-opacity="0.7" marker-end="url(#arr-p)"/>
+  <text x="268" y="370" class="mp" font-size="9" transform="rotate(-90 268 370)">:8100</text>
+  <path d="M252,498 L276,498 L276,342 L292,342" fill="none" stroke="#FBA94C" stroke-width="1.5" stroke-opacity="0.7" marker-end="url(#arr-o)"/>
+  <text x="268" y="418" class="mo" font-size="9" transform="rotate(-90 268 418)">:9100</text>
+
+  <!-- namespace arrows row 2 -->
+  <path d="M252,434 L564,434 L564,396 L588,396" fill="none" stroke="#7DD3FC" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-b)"/>
+  <path d="M252,486 L552,486 L552,440 L588,440" fill="none" stroke="#C4B5FD" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-p)"/>
+  <path d="M252,502 L540,502 L540,484 L588,484" fill="none" stroke="#FBA94C" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-o)"/>
+
+  <!-- port arrows row 3 -->
+  <path d="M252,626 L280,626 L280,214 L292,214" fill="none" stroke="#7DD3FC" stroke-width="1.5" stroke-opacity="0.5" marker-end="url(#arr-b)"/>
+  <path d="M252,662 L280,662 L280,278 L292,278" fill="none" stroke="#C4B5FD" stroke-width="1.5" stroke-opacity="0.5" marker-end="url(#arr-p)"/>
+  <path d="M252,686 L280,686 L280,342 L292,342" fill="none" stroke="#FBA94C" stroke-width="1.5" stroke-opacity="0.5" marker-end="url(#arr-o)"/>
+
+  <!-- namespace arrows row 3 -->
+  <path d="M252,622 L568,622 L568,584 L588,584" fill="none" stroke="#7DD3FC" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-b)"/>
+  <path d="M252,674 L556,674 L556,628 L588,628" fill="none" stroke="#C4B5FD" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-p)"/>
+  <path d="M252,690 L544,690 L544,672 L588,672" fill="none" stroke="#FBA94C" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr-o)"/>
+
+  <!-- bottom legend -->
+  <rect x="32" y="720" width="816" height="1" fill="#263050"/>
+  <line x1="48" y1="740" x2="68" y2="740" stroke="#7DD3FC" stroke-width="2"/>
+  <text x="76" y="744" class="s" font-size="10">MySQL &#183; {ns} database</text>
+  <line x1="220" y1="740" x2="240" y2="740" stroke="#C4B5FD" stroke-width="2"/>
+  <text x="248" y="744" class="s" font-size="10">DynamoDB &#183; {ns_} table prefix</text>
+  <line x1="440" y1="740" x2="460" y2="740" stroke="#FBA94C" stroke-width="2"/>
+  <text x="468" y="744" class="s" font-size="10">S3 &#183; {nsdash} bucket name</text>
+  <text x="680" y="744" class="s" font-size="10">shared container, isolated data</text>
+</svg>
