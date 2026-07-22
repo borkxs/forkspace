@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { doDown, doUp } from "../src/cli";
-import { loadConfig } from "../src/config";
+import { doDown, doUp } from "../src/ops.js";
+import { loadConfig } from "../src/config.js";
 import {
   acquireLock,
   isLockStale,
@@ -11,8 +11,8 @@ import {
   readLockFile,
   tryAcquireLock,
   withStateLock,
-} from "../src/lock";
-import { loadState, saveState, stateDir } from "../src/state";
+} from "../src/lock.js";
+import { loadState, saveState, stateDir } from "../src/state.js";
 
 function tempRoot(): string {
   return mkdtempSync(path.join(os.tmpdir(), "forkspace-lock-"));

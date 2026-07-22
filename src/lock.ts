@@ -8,7 +8,7 @@ import {
   writeSync,
 } from "node:fs";
 import path from "node:path";
-import { stateDir } from "./state";
+import { stateDir } from "./state.js";
 
 const LOCK_FILE = "state.lock";
 

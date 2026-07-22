@@ -1,29 +1,29 @@
 import { describe, expect, it } from "vitest";
 import path from "node:path";
 import { existsSync, rmSync } from "node:fs";
-import { parseConfig, checkConfig, loadConfig } from "../src/config";
-import { doUp } from "../src/cli";
-import { portFor, allocateSlot } from "../src/ports";
-import { buildOverrideYaml, groupByComposeFile } from "../src/compose";
-import { renderEnvFile, envToRecord, envFileName } from "../src/env";
+import { parseConfig, checkConfig, loadConfig } from "../src/config.js";
+import { doUp } from "../src/ops.js";
+import { portFor, allocateSlot } from "../src/ports.js";
+import { buildOverrideYaml, groupByComposeFile } from "../src/compose.js";
+import { renderEnvFile, envToRecord, envFileName } from "../src/env.js";
 import {
   assertNoForkCollisions,
   FORK_NAME_MAX_LENGTH,
   validateForkName,
-} from "../src/fork";
-import { nsFor, nsDashFor, effectiveNs } from "../src/ns";
-import { instanceKey, loadState, projectName, saveState, type State } from "../src/state";
+} from "../src/fork.js";
+import { nsFor, nsDashFor, effectiveNs } from "../src/ns.js";
+import { instanceKey, loadState, projectName, saveState, type State } from "../src/state.js";
 import {
   containerIsolated,
   planInstance,
   planSlotProbe,
-} from "../src/plan";
+} from "../src/plan.js";
 import {
   diffNamespaces,
   namespacesInState,
   orphanReports,
   parseNamespaceLines,
-} from "../src/orphans";
+} from "../src/orphans.js";
 
 const MINIMAL_YML = `
 workspace: acme

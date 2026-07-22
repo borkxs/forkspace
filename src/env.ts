@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
 import path from "node:path";
-import type { ServiceDef } from "./config";
+import type { ServiceDef } from "./config.js";
 
 export interface EnvEntry {
   name: string; // forkspace service name, e.g. "mysql"
