@@ -1,5 +1,5 @@
-import { nsFor } from "./ns";
-import { instanceKey, projectName, type State } from "./state";
+import { nsFor } from "./ns.js";
+import { instanceKey, projectName, type State } from "./state.js";
 
 /** Max fork name length; matches nsFor truncation. */
 export const FORK_NAME_MAX_LENGTH = 32;

@@ -1,6 +1,6 @@
-import type { Config } from "./config";
-import { runHookCapture } from "./compose";
-import type { State } from "./state";
+import type { Config } from "./config.js";
+import { runHookCapture } from "./compose.js";
+import type { State } from "./state.js";
 
 export interface OrphanDiff {
   orphans: string[];

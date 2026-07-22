@@ -1,9 +1,9 @@
-import type { Config, EnvironmentDef } from "./config";
-import type { PlannedService } from "./compose";
-import type { AllocationEntry, EnvEntry } from "./env";
-import { effectiveNs, nsDashFor } from "./ns";
-import { portFor } from "./ports";
-import { instanceKey, projectName, type State } from "./state";
+import type { Config, EnvironmentDef } from "./config.js";
+import type { PlannedService } from "./compose.js";
+import type { AllocationEntry, EnvEntry } from "./env.js";
+import { effectiveNs, nsDashFor } from "./ns.js";
+import { portFor } from "./ports.js";
+import { instanceKey, projectName, type State } from "./state.js";
 
 export interface InstancePlan {
   containersToStart: PlannedService[];

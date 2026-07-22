@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
-import type { Config } from "./config";
-import { recordedProjects, stateDir, type State } from "./state";
+import type { Config } from "./config.js";
+import { recordedProjects, stateDir, type State } from "./state.js";
 
 export interface InferredProject {
   env: string;

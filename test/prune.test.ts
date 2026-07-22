@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { parseComposeLsOutput } from "../src/compose";
-import { parseConfig } from "../src/config";
-import { rollbackFailedUp } from "../src/cli";
-import { planInstance } from "../src/plan";
+import { parseComposeLsOutput } from "../src/compose.js";
+import { parseConfig } from "../src/config.js";
+import { rollbackFailedUp } from "../src/ops.js";
+import { planInstance } from "../src/plan.js";
 import {
   formatPrunePlan,
   inferEnvFromProject,
@@ -15,8 +15,8 @@ import {
   pruneNeedsForce,
   shouldRemoveVolumesForProject,
   strandedProjects,
-} from "../src/prune";
-import { loadState, saveState, type State } from "../src/state";
+} from "../src/prune.js";
+import { loadState, saveState, type State } from "../src/state.js";
 
 const MINIMAL_YML = `
 workspace: acme

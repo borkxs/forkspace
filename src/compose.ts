@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import type { ServiceDef } from "./config";
+import type { ServiceDef } from "./config.js";
 
 export interface PlannedService {
   name: string; // forkspace service name
